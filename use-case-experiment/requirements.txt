@@ -1,0 +1,4 @@
+pymongo[srv]>=4.10,<5
+scikit-learn
+torch
+sentence-transformers>=3,<6
