@@ -22,7 +22,7 @@ from demo.common import client
 from demo.presenter import relay, safe_api, watch
 from platform_api.activity import Events
 from platform_api.app import frame
-from platform_api.config import identities
+from platform_api.config import identities, utcnow
 from platform_api.models import Body, Candidate, Conditions, Plan, Publish, ResultID, Search, Tag, Text
 from platform_api.profile import experiment
 from platform_api.store import Store
@@ -160,15 +160,17 @@ def event_batch(after: int = 0):
     return {"session": current.session, "events": current.events.since(current.project, after)}
 
 
-def discover(body):
+def discover(body, source):
     rows = api("reader", "POST", "/v1/search", body.model_dump())["candidates"]
-    app.state.events.send(app.state.project, "search", {"candidates": rows})
+    app.state.events.send(app.state.project, "search", {
+        "candidates": rows, "source": source, "searched_at": utcnow(),
+    })
     return rows
 
 
 @app.post("/api/search")
 def browser_search(body: Search):
-    return {"candidates": discover(body)}
+    return {"candidates": discover(body, "library")}
 
 
 @app.get("/api/results/{result_id}/history")
@@ -234,7 +236,7 @@ def experiment_profile() -> dict:
 @mcp.tool()
 def search_experiments(question: str, conditions: dict | None = None) -> list[dict]:
     """Use Atlas semantic search. Pass profile task conditions for authoritative fit labels."""
-    return discover(Search(question=question, conditions=conditions))
+    return discover(Search(question=question, conditions=conditions), "agent")
 
 
 @mcp.tool()
