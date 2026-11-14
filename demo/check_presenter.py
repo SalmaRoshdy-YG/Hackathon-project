@@ -7,7 +7,7 @@ from time import monotonic
 
 import httpx
 
-from benchmark.client import require, save
+from platform_api.client import require, save
 from demo.harness import fixture, free_port, subprocess_service, wait_for
 
 

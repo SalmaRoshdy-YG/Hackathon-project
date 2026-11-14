@@ -4,12 +4,12 @@ from concurrent.futures import ThreadPoolExecutor
 import json
 from pathlib import Path
 
-from benchmark.client import require, save
+from platform_api.client import require, save
 from benchmark.publish import document, replacement
 from benchmark.run import CATALOG, QUESTION, REQUEST, TASK, measure
 from demo.common import client, run_agent
 from demo.harness import fixture, wait_for
-from platform_api.preflight import has, path, search
+from demo.check_platform import has, path, search
 
 
 def write(directory, name, value):

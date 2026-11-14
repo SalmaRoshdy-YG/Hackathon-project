@@ -1,18 +1,16 @@
 """Run a second experiment through the same presenter and live Atlas API."""
-import os
 from pathlib import Path
 
 import httpx
 
-from benchmark.client import require, save
+from platform_api.client import require, save
 from demo.common import client
 from demo.harness import fixture, free_port, subprocess_service, wait_for
 from tests.lookup_profile import TASK, QUESTION
 
 
 def verify(out):
-    os.environ["MEMORY_EXPERIMENT_MODULE"] = "tests.lookup_profile"
-    with fixture(out, "lookup-profile"), client("reader") as reader:
+    with fixture(out, "lookup-profile", profile="tests.lookup_profile"), client("reader") as reader:
         port = free_port()
         with subprocess_service("demo.presenter:app", port, out/"presenter.log"), \
                 httpx.Client(base_url=f"http://127.0.0.1:{port}", timeout=40, trust_env=False) as web:

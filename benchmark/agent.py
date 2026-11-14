@@ -5,7 +5,7 @@ import os
 
 import httpx
 
-from benchmark.client import connect, require, save
+from platform_api.client import connect, require, save
 from benchmark.run import CATALOG, QUESTION, REQUEST, TASK
 from platform_api.models import Plan
 

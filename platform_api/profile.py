@@ -9,7 +9,6 @@ from pydantic import TypeAdapter
 
 from platform_api.models import Conditions, JobID, Tag
 
-DEFAULT_PROFILE = "benchmark.profile"
 LEGACY_PROFILE_ID = "compression-v1"
 CONDITION_KEY = re.compile(r"[a-zA-Z_][a-zA-Z0-9_-]{0,79}")
 
@@ -43,32 +42,11 @@ class Experiment:
         return set(self.match_fields).difference(conditions.root)
 
 
-@dataclass(frozen=True)
-class Presentation:
-    question: str
-    conditions: dict
-    producer_module: str
-    agent_module: str
-    replacement: Callable[[], dict]
-    environment: Callable[[], dict]
-
-
-def profile_module():
-    return import_module(os.getenv("MEMORY_EXPERIMENT_MODULE", DEFAULT_PROFILE))
-
-
 def experiment():
-    selected = profile_module().EXPERIMENT
+    module = os.getenv("MEMORY_EXPERIMENT_MODULE")
+    if not module:
+        return None
+    selected = import_module(module).EXPERIMENT
     if not isinstance(selected, Experiment):
         raise TypeError("configured EXPERIMENT must be an Experiment")
     return selected
-
-
-def presentation(selected):
-    demo = profile_module().PRESENTATION
-    if not isinstance(demo, Presentation) or not demo.question.strip():
-        raise ValueError("invalid presenter profile")
-    conditions = Conditions.model_validate(demo.conditions)
-    if selected.missing_conditions(conditions) or not selected.validate_task(conditions.root):
-        raise ValueError("invalid presenter profile")
-    return demo

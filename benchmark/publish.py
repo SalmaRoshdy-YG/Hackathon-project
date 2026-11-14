@@ -1,7 +1,7 @@
 import argparse
 from datetime import datetime, timedelta, timezone
 
-from benchmark.client import connect, require, save
+from platform_api.client import connect, require, save
 from benchmark.run import measure
 
 HYPOTHESES = {

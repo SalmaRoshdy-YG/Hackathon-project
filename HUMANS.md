@@ -29,6 +29,7 @@ From the repository root, use a clean checkout and Python 3.11. Ask P1 for the l
 python -m pip install -r requirements.txt
 python -m benchmark.run --job dict-a-l6 --cohort A --split holdout
 python -m platform_api.preflight
+python -m demo.check_platform
 python -m demo.rehearse --out receipts/rehearsal
 ```
 

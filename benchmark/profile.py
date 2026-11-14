@@ -1,10 +1,6 @@
-"""Compression experiment and presenter entry points."""
-import zlib
-
-from benchmark.agent import planner_name
-from benchmark.publish import replacement
-from benchmark.run import CATALOG, FIXTURE, TASK, measure, QUESTION
-from platform_api.profile import Experiment, Presentation
+"""Optional compression jobs for the experiment runner."""
+from benchmark.run import CATALOG, FIXTURE, TASK, measure
+from platform_api.profile import Experiment
 
 
 def valid_task(conditions):
@@ -27,6 +23,3 @@ def run_job(job, conditions):
 
 EXPERIMENT = Experiment("compression-v1", CATALOG, "plain-l1",
     ("fixture_revision", "cohort", "codec", "dictionary_revision"), valid_task, supports, run_job)
-
-PRESENTATION = Presentation(QUESTION, TASK, "benchmark.publish", "benchmark.agent",
-    replacement, lambda: {"planner": planner_name(), "zlib_version": zlib.ZLIB_RUNTIME_VERSION})

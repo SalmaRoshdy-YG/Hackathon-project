@@ -4,7 +4,7 @@ import os
 import subprocess
 import sys
 
-from benchmark.client import connect
+from platform_api.client import connect
 
 
 def run_agent(module, token_env, *args):

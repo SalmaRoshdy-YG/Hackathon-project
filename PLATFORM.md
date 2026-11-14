@@ -110,7 +110,7 @@ db.result_vectors.aggregate([
 
 ## Experiment profiles
 
-The API and presenter load the same trusted Python profile using `MEMORY_EXPERIMENT_MODULE`. Job IDs, baseline, task validation, match fields, evidence support, and the runner come from the profile. The selected profile ID is persisted in decisions and checked again before dispatch. The example pipeline and workflow below describe the default compression profile. See [BACKEND.md](BACKEND.md#switch-experiments) for the adapter contract and the verified lookup example.
+The API starts with its memory and governance endpoints. Configure a trusted server-side experiment to enable execution using `MEMORY_EXPERIMENT_MODULE`. Job IDs, baseline, task validation, match fields, evidence support, and the runner come from the profile. The selected profile ID is persisted in decisions and checked again before dispatch. The optional presenter loads its workflow from `MEMORY_PRESENTATION_MODULE`. The example below uses the compression profile. See [BACKEND.md](BACKEND.md#switch-experiments) for the adapter contract and the verified lookup example.
 
 ## Benchmark and agent decision
 

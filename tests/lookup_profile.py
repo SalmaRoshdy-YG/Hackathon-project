@@ -4,9 +4,10 @@ from datetime import timedelta
 from hashlib import sha256
 from platform import python_version
 
-from benchmark.client import connect, require, save
+from platform_api.client import connect, require, save
 from platform_api.config import utcnow
-from platform_api.profile import Experiment, Presentation
+from demo.profile import Presentation
+from platform_api.profile import Experiment
 
 TASK = {"fixture_revision": "ordered-table-v1", "layout": "sorted", "size": 128, "phase": "holdout"}
 QUESTION = "How can we find a stored customer ID with fewer comparisons?"

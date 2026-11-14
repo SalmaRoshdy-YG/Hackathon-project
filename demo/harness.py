@@ -10,8 +10,7 @@ from uuid import uuid4
 import httpx
 
 from demo.common import client
-from demo.setup import roles
-from platform_api.config import identities
+from platform_api.setup import roles
 from platform_api.store import Store
 
 
@@ -33,10 +32,10 @@ def free_port():
 
 
 @contextmanager
-def subprocess_service(target, port, logfile):
+def subprocess_service(target, port, logfile, *, cwd=None):
     with Path(logfile).open("w", encoding="utf-8") as log:
         proc = subprocess.Popen([sys.executable, "-m", "uvicorn", target, "--host", "127.0.0.1",
-                                 "--port", str(port), "--no-access-log"], stdout=log, stderr=log)
+                                 "--port", str(port), "--no-access-log"], stdout=log, stderr=log, cwd=cwd)
         try:
             yield proc
         finally:
@@ -49,7 +48,7 @@ def subprocess_service(target, port, logfile):
 
 
 @contextmanager
-def fixture(out, prefix="check"):
+def fixture(out, prefix="check", *, profile="benchmark.profile", cwd=None):
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     project = f"{prefix}-{uuid4().hex[:12]}"
@@ -63,6 +62,8 @@ def fixture(out, prefix="check"):
     env["MEMORY_OTHER_PUBLISHER_TOKEN"] = other
     env["MEMORY_TOKENS_JSON"] = json.dumps(mapping)
     port = free_port()
+    env["MEMORY_EXPERIMENT_MODULE"] = profile or ""
+    env["MEMORY_PRESENTATION_MODULE"] = "demo.compression" if profile == "benchmark.profile" else ""
     env["MEMORY_API_URL"] = f"http://127.0.0.1:{port}"
     prior = {key: os.environ.get(key) for key in env}
     os.environ.update(env)
@@ -70,7 +71,7 @@ def fixture(out, prefix="check"):
     try:
         store.setup()
         wait_for(store.index_state, lambda s: s == "READY", "queryable Atlas index", seconds=95)
-        with subprocess_service("platform_api.app:app", port, out/"platform.log") as proc:
+        with subprocess_service("platform_api.app:app", port, out/"platform.log", cwd=cwd) as proc:
             with client("reader") as api:
                 def health():
                     if proc.poll() is not None:

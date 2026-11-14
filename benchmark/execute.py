@@ -1,6 +1,6 @@
 import argparse
 
-from benchmark.client import connect, require, save
+from platform_api.client import connect, require, save
 
 
 def execute(client, decision_id):

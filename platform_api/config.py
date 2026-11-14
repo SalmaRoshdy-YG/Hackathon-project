@@ -26,6 +26,8 @@ def identities():
                            for value in (identity.project_id, identity.agent_id))):
             raise ValueError("invalid identity configuration")
         mapping[token] = identity
+    if not mapping:
+        raise ValueError("configure at least one project identity")
     return mapping
 
 

@@ -96,11 +96,17 @@ def results(request: Request, who=Principal):
 
 @app.post("/v1/search")
 def search(request: Request, body: Search, who=Principal):
-    experiment = request.app.state.experiment
-    if body.conditions is not None and experiment.missing_conditions(body.conditions):
-        error(422, "missing_match_conditions")
+    selected = request.app.state.experiment
+    match_fields = ()
+    if body.conditions is not None:
+        if selected is not None:
+            if selected.missing_conditions(body.conditions):
+                error(422, "missing_match_conditions")
+            match_fields = selected.match_fields
+        else:
+            match_fields = tuple(body.conditions.root)
     try:
-        return {"candidates": request.app.state.store.search(who, body, experiment.match_fields)}
+        return {"candidates": request.app.state.store.search(who, body, match_fields)}
     except (PyMongoError, httpx.HTTPError, KeyError, ValueError):
         error(503, "search_unavailable")
 

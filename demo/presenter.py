@@ -19,7 +19,8 @@ from platform_api.activity import Events
 from platform_api.app import frame
 from platform_api.config import identities, utcnow
 from platform_api.models import Approve, Body, Expire, Reject, ResultID
-from platform_api.profile import experiment, presentation
+from demo.profile import presentation
+from platform_api.profile import experiment
 from platform_api.store import Store
 from typing import Literal
 

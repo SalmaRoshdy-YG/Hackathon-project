@@ -43,8 +43,13 @@ class Decisions:
         q = {"project_id": identity.project_id}
         return [outward(doc) for doc in self.collection.find(q).sort("created_at", -1).limit(40)]
 
+    def execution_profile(self):
+        if self.experiment is None:
+            error(409, "experiment_runner_not_configured")
+        return self.experiment
+
     def propose(self, identity, body):
-        experiment = self.experiment
+        experiment = self.execution_profile()
         if (body.job_id not in experiment.catalog
                 or any(skip.job_id not in experiment.catalog for skip in body.skipped_jobs)):
             error(422, "unknown_experiment_job")
@@ -110,7 +115,7 @@ class Decisions:
 
     def dispatch(self, identity, decision_id):
         existing = self.can_dispatch(identity, decision_id)
-        experiment = self.experiment
+        experiment = self.execution_profile()
         if (existing.get("experiment_id", LEGACY_PROFILE_ID) != experiment.id
                 or existing["catalog"] != list(experiment.catalog)):
             error(409, "decision_experiment_changed")
