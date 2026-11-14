@@ -8,49 +8,22 @@ from train import train_digits
 
 
 TASK = Path(__file__).with_name("AGENT-TASK.md")
-DEFAULT_MODEL = "gpt-4.1-mini-2025-04-14"
-DECISION_FORMAT = {
-    "type": "json_schema",
-    "name": "training_decision",
-    "strict": True,
-    "schema": {
-        "type": "object",
-        "properties": {
-            "job": {"type": "string", "enum": ["plain", "shortcut"]},
-            "reason": {"type": "string"},
-            "citations": {"type": "array", "items": {"type": "string"}},
-        },
-        "required": ["job", "reason", "citations"],
-        "additionalProperties": False,
-    },
-}
 
 
-def run_agent(client, model, evidence, seed):
-    prompt = {
-        "task": TASK.read_text(encoding="utf-8"),
-        "retrieved_evidence": evidence,
-    }
-    response = client.responses.create(
-        model=model,
-        input=json.dumps(prompt),
-        tools=[],
-        store=False,
-        temperature=0,
-        max_output_tokens=400,
-        text={"format": DECISION_FORMAT},
-    )
-    if response.status != "completed" or not response.output_text:
-        raise RuntimeError("The model did not return a complete decision.")
-    decision = json.loads(response.output_text)
-    if set(decision["citations"]) - {record["id"] for record in evidence}:
-        raise RuntimeError("The model cited evidence it was not given.")
-    return {
-        "model": response.model,
-        "agent_input": prompt,
-        "decision": decision,
-        "measurement": train_digits(decision["job"], seed),
-    }
+def read_decision(evidence):
+    decision = json.loads(input("Paste the agent's one-line JSON decision and press Enter: "))
+    if not isinstance(decision, dict) or decision.keys() != {"job", "reason", "citations"}:
+        raise ValueError("Expected a JSON object with job, reason, and citations.")
+    if decision["job"] not in ("plain", "shortcut"):
+        raise ValueError("The job must be plain or shortcut.")
+    if not isinstance(decision["reason"], str) or not decision["reason"].strip():
+        raise ValueError("The decision must include a reason.")
+    citations = decision["citations"]
+    if not isinstance(citations, list) or any(not isinstance(item, str) for item in citations):
+        raise ValueError("Citations must be a JSON array of evidence IDs.")
+    if set(citations) - {record["id"] for record in evidence}:
+        raise ValueError("The agent cited evidence it was not given.")
+    return decision
 
 
 def main():
@@ -60,29 +33,33 @@ def main():
     parser.add_argument("--out", type=Path, help="Save the JSON receipt")
     args = parser.parse_args()
 
-    if args.command == "probe":
-        result = [train_digits(job, args.seed) for job in ("plain", "shortcut")]
-    else:
-        required = ["OPENAI_API_KEY"]
-        if args.command in ("on", "seed"):
-            required.extend(["MEMORY_ATLAS_URI", "MEMORY_ATLAS_DB"])
+    if args.command in ("on", "seed"):
+        required = ["MEMORY_ATLAS_URI", "MEMORY_ATLAS_DB"]
         missing = [name for name in required if not os.environ.get(name)]
         if missing:
             parser.error("Set " + ", ".join(missing) + " before running " + args.command)
+        from memory_store import retrieve, seed_memory
 
-        from openai import OpenAI
-
-        with OpenAI(timeout=30) as client:
-            if args.command in ("on", "seed"):
-                from memory_store import retrieve, seed_memory
-            if args.command == "seed":
-                result = seed_memory(client)
-            else:
-                evidence = retrieve(client) if args.command == "on" else []
-                result = run_agent(
-                    client, os.environ.get("DEMO_MODEL", DEFAULT_MODEL), evidence, args.seed
-                )
-                result["memory"] = args.command
+    if args.command == "probe":
+        result = [train_digits(job, args.seed) for job in ("plain", "shortcut")]
+    elif args.command == "seed":
+        result = seed_memory()
+    else:
+        evidence = retrieve() if args.command == "on" else []
+        prompt = (
+            TASK.read_text(encoding="utf-8").rstrip()
+            + "\n\nRetrieved experiment records\n\n"
+            + json.dumps(evidence, indent=2)
+        )
+        print("\nPaste the text between the lines into a fresh Codex or Claude Code session.\n")
+        print(f"-----\n{prompt}\n-----\n")
+        decision = read_decision(evidence)
+        result = {
+            "memory": args.command,
+            "agent_input": prompt,
+            "decision": decision,
+            "measurement": train_digits(decision["job"], args.seed),
+        }
 
     output = json.dumps(result, indent=2)
     if args.out:
@@ -94,5 +71,5 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except (RuntimeError, ValueError) as error:
-        sys.exit(str(error))
+    except (EOFError, RuntimeError, ValueError) as error:
+        sys.exit(str(error) or "No decision received.")

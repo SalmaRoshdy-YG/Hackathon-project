@@ -4,9 +4,9 @@ from pymongo import MongoClient
 from pymongo.operations import SearchIndexModel
 
 
-COLLECTION = "digits_demo_memory"
-INDEX = "digits_evidence_v1"
-EMBEDDING = "text-embedding-3-small"
+COLLECTION = "digits_demo_memory_minilm"
+INDEX = "digits_minilm_evidence_v1"
+EMBEDDING = "sentence-transformers/all-MiniLM-L6-v2"
 SOURCE = (
     "https://github.com/ARA-Labs/Agent-Native-Research-Artifact/blob/"
     "e52a925e9d03b4ada3008653e72f99b04116fca2/examples/resnet-ara-example/"
@@ -32,12 +32,16 @@ def mongo_client():
     return MongoClient(os.environ["MEMORY_ATLAS_URI"], serverSelectionTimeoutMS=8000)
 
 
-def embed(client, value):
-    return client.embeddings.create(model=EMBEDDING, input=value).data[0].embedding
+def embed(value):
+    from sentence_transformers import SentenceTransformer
+
+    model = SentenceTransformer(EMBEDDING, device="cpu")
+    return model.encode(value, normalize_embeddings=True).tolist()
 
 
-def seed_memory(client):
-    vector = embed(client, EVIDENCE["dataset"] + ". " + EVIDENCE["finding"])
+def seed_memory():
+    vector = embed(EVIDENCE["dataset"] + ". " + EVIDENCE["finding"])
+
     with mongo_client() as mongo:
         collection = mongo[os.environ["MEMORY_ATLAS_DB"]][COLLECTION]
         collection.update_one(
@@ -53,15 +57,15 @@ def seed_memory(client):
                 definition={"fields": [{
                     "type": "vector",
                     "path": "embedding",
-                    "numDimensions": 1536,
+                    "numDimensions": 384,
                     "similarity": "cosine",
                 }]},
             ))
     return {"seeded": EVIDENCE["id"], "index": INDEX, "note": "Wait for the index to be queryable."}
 
 
-def retrieve(client):
-    vector = embed(client, QUERY)
+def retrieve():
+    vector = embed(QUERY)
     with mongo_client() as mongo:
         collection = mongo[os.environ["MEMORY_ATLAS_DB"]][COLLECTION]
         if not any(index.get("queryable") for index in collection.list_search_indexes(INDEX)):
