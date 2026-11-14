@@ -19,7 +19,7 @@ Use separate branches or worktrees as needed. Agree on an owner for any shared f
 | Claim | Evidence |
 | --- | --- |
 | Persistent governed memory | A fresh agent retrieves applicable evidence via event Atlas Vector Search after the producer exits. Use a paraphrased request and an inapplicable distractor to show why experimental conditions matter. |
-| Memory changes behavior | With the same request, candidate jobs, and budget, compare actual executed configurations and outcomes with memory off, on, after correction, and after correction and expiry. Capture the exact result versions used. |
+| Memory changes behavior | With the same request, candidate jobs, and budget, compare actual executed configurations and outcomes for the same agent on its own (outside Precedent), with Precedent, after correction, and after correction and expiry. Capture the exact result versions used. |
 | Lifecycle and isolation | The owning project can search and look up the result. A second project fails both paths. Stale hits for expired or superseded versions are excluded. |
 | MongoDB visibly does the work | The Atlas activity strip and the per-stage callouts show the real search pipeline, atomic approval, the correction transaction, the dropped stale entry, and live change-stream updates. |
 | Humans govern it | A human approves or rejects each recommendation from the UI, and nothing runs without approval. Correction and expiry are done from the UI as separate events, each followed by a rerun of the same query, and version history stays visible. |

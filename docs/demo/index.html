@@ -235,6 +235,8 @@ pre.code{background:var(--code-bg);color:var(--code-fg);font:12px/1.55 var(--f-m
 <script>
 /* ---------- mockup data: ResNet-50 on ImageNet, simulated numbers ---------- */
 const TARGET = 0.75;
+/* Baseline: the same agent run outside Precedent (no token, no Atlas), recorded before the demo */
+const BASELINE = {id:'baseline',label:'Agent on its own',job:'scratch',acc:.41,gpu:8,cited:[],outside:true};
 const JOBS = {
   'warm-start':{label:'Start from stored weights',desc:'Load the best saved ResNet-50 and fine-tune briefly',acc:.763,gpu:0.6},
   'scratch':{label:'Train from scratch',desc:'Random weights, standard recipe, until the budget runs out',acc:.41,gpu:8},
@@ -309,8 +311,7 @@ function doSearch(){
 }
 function decide(){
   const d={id:'d-'+(++S.n),memory:S.memory,status:'pending',used:[],rejected:[],cands:[],gov:gov()};
-  if(S.memory==='off'){d.job='scratch';d.reason='No memory, so nothing to build on. Train from scratch and hope the budget is enough.'}
-  else{
+  {
     if(!S.search)doSearch(); d.cands=S.search.cands;
     const app=d.cands.filter(c=>c.applies), pos=app.find(c=>c.f.dir==='positive'&&c.f.weights), neg=app.find(c=>c.f.dir==='negative');
     d.rejected=d.cands.filter(c=>!c.applies).map(c=>c.f);
@@ -338,7 +339,7 @@ function execute(d){
   d.status='executed';d.receipt=r;S.receipts=S.receipts.filter(x=>x.label!==r.label);S.receipts.push(r);
 }
 const gov = () => ({corrected:S.findings.ckpt?.version===2,expired:S.findings.fastlr?.status==='expired'});
-function labelFor(d){if(d.memory==='off')return 'Without memory';return d.gov.corrected&&d.gov.expired?'After correction + expiry':d.gov.corrected?'After correction':d.gov.expired?'After expiry':'With memory'}
+function labelFor(d){return d.gov.corrected&&d.gov.expired?'After correction + expiry':d.gov.corrected?'After correction':d.gov.expired?'After expiry':'With Precedent'}
 function correct(reason){
   const f=S.findings.ckpt; if(f.version!==1) return;
   log('transaction','results',`correct ${f.id}: keep v1 in history, make v2 current`,{ms:21,docs:3,shape:{transaction:[{insert:'result_versions',doc:{result_id:f.id,version:1}},{update:'results',q:{_id:f.id,version:1},u:{$set:{version:2,'conditions.dataset':CORRECTION.dataset}}},{insert:'result_vectors',doc:{result_id:f.id,version:2}}]}});
@@ -369,7 +370,7 @@ function hl(o){return esc(JSON.stringify(o,null,2)).replace(/(&quot;[^&]*?&quot;
 const resultText=f=>f.acc!=null?pct(f.acc)+' accuracy':(f.accText||'No measurement');
 
 /* ---------- Demo stages ---------- */
-function done(){const g=gov(),L=S.receipts.map(r=>r.label);return [S.order.length===SEED.length,!!S.decision,!!S.decision&&S.decision.status!=='pending',L.includes('With memory'),g.corrected&&g.expired,L.length>=4]}
+function done(){const g=gov(),L=S.receipts.map(r=>r.label);return [S.order.length===SEED.length,!!S.decision,!!S.decision&&S.decision.status!=='pending',L.includes('With Precedent'),g.corrected&&g.expired,L.length>=4]}
 function demoPage(){
   const dn=done();
   return `<div class="stepper">${STAGES.map((s,i)=>`<button data-stage="${i+1}" class="${dn[i]?'done':''}" ${S.stage===i+1?'aria-current="step"':''} aria-label="Stage ${i+1}: ${s}"><span class="dotn">${dn[i]&&S.stage!==i+1?'✓':i+1}</span><span class="lbl">${s}</span></button>`).join('')}</div>
@@ -382,21 +383,12 @@ const st1=()=>`<p class="lede">Agents from different teams trained image models 
   <div class="fcards">${S.order.map(k=>S.findings[k]).map(f=>`<button class="fcard" data-f="${f.key}"><span class="t">${esc(f.title)}</span><span class="chips">${label(f)}${f.weights?' <span class="chip c-g">Weights saved</span>':''}${f.background?' <span class="chip c-line">From the paper</span>':''}</span>${f.acc!=null?bar(f.acc):''}<span class="s">${resultText(f)}</span>${who(f)}</button>`).join('')}</div>
   <div class="row"><button class="link" data-act="runA">Replay</button></div>
   ${mongo('Each result is one document, and the model weights are stored next to it with <b>GridFS</b>. New results appear here instantly through a <b>change stream</b>. The crash is saved too, but never offered as evidence.')}`;
-function st2(){
-  const s=S.search;
-  if(S.memory==='off') return `<p class="lede">Memory is turned off in Settings, so the new agent starts from nothing.</p>`;
-  return `<p class="lede">A brand-new agent gets a task. It has never talked to the other agents.</p>
-  <div class="card"><div class="agent" style="margin-bottom:10px"><span class="av b">N</span><b>New agent asks</b></div><p class="quote">“${REQUEST}”</p></div>
-  ${s?`<div class="found">${s.cands.map(c=>`<button class="frow" data-f="${c.f.key}"><span class="t">${esc(c.f.title)}</span>${label(c.f)}</button>`).join('')}
-    ${s.dropped.map(c=>`<div class="frow drop"><span class="t">${esc(c.f.title)}</span><span class="chip c-bad">Dropped: ${c.why}</span></div>`).join('')}</div>`:'<p class="muted">Searching…</p>'}
-  ${mongo(`<b>Atlas Vector Search</b> found the other agents’ work by meaning, inside this project only, in ${s?s.ms:'~40'} ms. The same query checked every result is still current${s&&s.dropped.length?' and dropped the ones that aren’t':''}.`)}`;
-}
 function st3(){
   const d=S.decision; if(!d) return '<p class="muted">Thinking…</p>';
   const col=(t,c,list,why)=>`<div class="group"><h4 style="color:${c}">${t}</h4>${list.map(x=>`<button class="ev" data-f="${x.f.key}"><span class="t">${esc(x.f.title)}</span><span class="r">${why(x)}</span></button>`).join('')||'<span class="muted" style="font-size:13px">None</span>'}</div>`;
   const drop=S.search&&d.memory==='on'?S.search.dropped:[];
   return `<div class="card"><div class="agent" style="margin-bottom:8px"><span class="av b">N</span><b>A new agent asks</b><span class="chip c-line">never talked to the other agents</span></div><p class="quote">“${REQUEST}”</p></div>
-  ${d.memory==='off'?'<p class="lede">Memory is turned off in Settings, so it starts from nothing.</p>':`<p class="lede">It searches the shared memory and sorts what it finds for this task: ResNet-50, ImageNet, full-size images.</p>`}
+  <p class="lede">It searches the shared memory and sorts what it finds for this task: ResNet-50, ImageNet, full-size images.</p>
   ${d.memory==='on'?`<div class="grid3">
     ${col('Fits and worked','var(--pos)',d.cands.filter(c=>c.applies&&c.f.dir==='positive'),c=>pct(c.f.acc)+', weights saved')}
     ${col('Fits and failed','var(--neg)',d.cands.filter(c=>c.applies&&c.f.dir==='negative'),c=>'Collapsed to '+pct(c.f.acc))}
@@ -416,15 +408,25 @@ function st4(){
   ${mongo(d.status==='pending'?'Approving is a single <b>atomic update</b> that only works while the plan is still waiting.':d.status==='rejected'?'Rejected and saved. Training only starts for approved plans, so nothing ran.':'Approved exactly once. A second approval finds nothing waiting and is refused.')}`;
 }
 function st5(){
-  const d=S.decision, r=d&&d.receipt, base=S.receipts.find(x=>x.label==='Without memory');
+  const d=S.decision, r=d&&d.receipt, base=BASELINE;
   if(!d||d.status==='pending'||d.status==='rejected') return `<p class="lede">${d&&d.status==='rejected'?'The plan was rejected, so nothing trains.':'Waiting for approval at stage 3.'}</p>`;
   if(!r) return `<p class="lede">The approved plan runs within the 8 GPU-hour budget.</p><div class="row"><button class="btn" data-act="execute">Start training</button></div>
     ${mongo(d.job==='warm-start'?'The saved weights will stream out of Atlas with <b>GridFS</b>, after a last check that nobody corrected or expired them.':'Training starts from random weights.')}`;
-  return `<p class="lede">Same task, same budget. One run started from memory, the other trained blind.</p>
-  <div class="card"><div class="row" style="justify-content:space-between;margin-bottom:14px"><div><div class="big" style="color:var(${r.acc>=TARGET?'--pos':'--neg'})">${pct(r.acc)}</div><p class="muted">accuracy · ${r.gpu} GPU-hours used</p></div>
-    ${base?`<div style="text-align:right"><div class="big">${(base.gpu-r.gpu).toFixed(1)} h</div><p class="muted">of GPU time saved</p></div>`:''}</div>
-    <div class="compare"><div class="crow"><span class="lbl">${r.label}<small>${JOBS[r.job].label}</small></span>${bar(r.acc,true)}<span class="v">${pct(r.acc)}</span></div>
-    ${base&&base!==r?`<div class="crow"><span class="lbl">Without memory<small>${JOBS[base.job].label}</small></span>${bar(base.acc,true)}<span class="v">${pct(base.acc)}</span></div>`:''}</div>${legend()}</div>
+  return `<p class="lede">Same agent, same task, same 8 GPU-hours. The only difference is Precedent.</p>
+  <div class="grid2">
+    <div class="card" style="background:var(--code-bg);color:var(--code-fg);border-color:var(--code-bg)"><div class="eyebrow" style="color:var(--code-c)">Agent on its own · no Precedent</div>
+      <pre style="margin:10px 0 0;font:12.5px/1.7 var(--f-mono);white-space:pre-wrap">$ agent "train a ResNet-50 to 75% on ImageNet,
+         8 GPU-hours"
+› No prior results. Starting from random weights.
+› Guessing settings: learning rate 0.1, batch 256
+› epoch 4 of 90 … budget used up
+› accuracy: <span style="color:#F2A27C">${pct(base.acc)}</span>   GPU-hours: ${base.gpu}</pre></div>
+    <div class="card" style="border-color:var(--green)"><div class="eyebrow" style="color:var(--green)">Same agent with Precedent</div>
+      <div class="big" style="margin-top:10px;color:var(${r.acc>=TARGET?'--pos':'--neg'})">${pct(r.acc)}</div><p class="muted">accuracy · ${r.gpu} GPU-hours used · ${JOBS[r.job].label.toLowerCase()}</p>
+      ${r.job==='warm-start'?`<p style="margin-top:10px"><span class="chip c-g">${(base.gpu-r.gpu).toFixed(1)} GPU-hours saved</span> <span class="chip c-g">reached the 75% target</span></p>`:''}</div>
+  </div>
+  <div class="card"><div class="compare"><div class="crow"><span class="lbl">With Precedent<small>${JOBS[r.job].label}</small></span>${bar(r.acc,true)}<span class="v">${pct(r.acc)}</span></div>
+    <div class="crow"><span class="lbl">Agent on its own<small>outside the platform</small></span>${bar(base.acc,true)}<span class="v">${pct(base.acc)}</span></div></div>${legend()}</div>
   ${mongo(r.job==='warm-start'?'The cited results were re-checked, the 98 MB checkpoint streamed from <b>GridFS</b>, and the result was saved and pushed to this screen.':'The result was saved and pushed to this screen.')}`;
 }
 function st6(){
@@ -449,9 +451,9 @@ function st6(){
   ${mongo(g.expired?'Expiry took effect on the very next search. Atlas will delete the record later with a <b>TTL index</b>, but nothing waits for that.':g.corrected?'The correction was one <b>transaction</b>: the old version is kept for people to read, and only the new one can be used by agents.':'Corrections and expiry change what every agent can use, starting with the next search.')}`;
 }
 function st7(){
-  const L=['Without memory','With memory','After correction','After correction + expiry'], by=l=>S.receipts.find(r=>r.label===l);
-  return `<p class="lede">Same task, same 8 GPU-hour budget, one try each. Only the memory changed.</p>
-  <div class="card"><div class="compare">${L.map(l=>{const r=by(l);return `<div class="crow"><span class="lbl">${l}<small>${r?JOBS[r.job].label+' · '+r.gpu+' GPU-h':'not run yet'}</small></span>${r?bar(r.acc,true):'<div class="bar lg"><s></s></div>'}<span class="v" style="color:var(${r?(r.acc>=TARGET?'--pos':'--neg'):'--muted'})">${r?pct(r.acc):'—'}</span></div>`}).join('')}</div>${legend()}</div>
+  const L=['Agent on its own','With Precedent','After correction','After correction + expiry'], by=l=>S.receipts.find(r=>r.label===l);
+  return `<p class="lede">Same agent, same task, same 8 GPU-hour budget, one try each. First on its own, then with Precedent as people corrected and expired what it knew.</p>
+  <div class="card"><div class="compare">${L.map(l=>{const r=by(l);return `<div class="crow"><span class="lbl">${l}<small>${r?(r.outside?'outside the platform':JOBS[r.job].label)+' · '+r.gpu+' GPU-h':'not run yet'}</small></span>${r?bar(r.acc,true):'<div class="bar lg"><s></s></div>'}<span class="v" style="color:var(${r?(r.acc>=TARGET?'--pos':'--neg'):'--muted'})">${r?pct(r.acc):'—'}</span></div>`}).join('')}</div>${legend()}</div>
   ${mongo('Every run records the exact result versions and weights it read from Atlas, so each decision traces back to its evidence.')}`;
 }
 
@@ -477,9 +479,8 @@ function settingsPage(){
   return `<div><div class="eyebrow">Settings</div><h1>Environment</h1></div>
   <div class="grid2">
     <div class="card"><h2 style="margin-bottom:10px">MongoDB Atlas</h2><dl class="kv"><dt>status</dt><dd style="color:var(--pos)">connected</dd><dt>database</dt><dd>research_memory</dd><dt>vector index</dt><dd>research_memory_v1 · ready</dd><dt>model weights</dt><dd>GridFS · 2 files · 192 MB</dd><dt>change streams</dt><dd>on</dd><dt>cleanup</dt><dd>TTL index on purge_at</dd></dl></div>
-    <div class="card"><h2 style="margin-bottom:10px">Agent memory</h2><div class="toggle" role="group" aria-label="Agent memory"><button data-mem="on" aria-pressed="${S.memory==='on'}">On</button><button data-mem="off" aria-pressed="${S.memory==='off'}">Off</button></div>
-      <p class="muted" style="font-size:13px;margin-top:10px">Off records the baseline: the agent skips memory and trains from scratch.</p></div>
     <div class="card"><h2 style="margin-bottom:10px">Agents in this project</h2><ul style="margin:0;padding-left:18px;font-size:13.5px;display:flex;flex-direction:column;gap:4px">${agents.map(a=>`<li>${esc(a)}</li>`).join('')}<li>new agent · reads and recommends</li></ul></div>
+    <div class="card"><h2 style="margin-bottom:10px">Baseline</h2><p style="font-size:13.5px">The “agent on its own” result comes from the same agent run <b>outside Precedent</b>, with no access to the memory. It was recorded before the demo.</p><p class="muted" style="font-size:13px;margin-top:8px">${pct(BASELINE.acc)} accuracy · ${BASELINE.gpu} GPU-hours</p></div>
     <div class="card"><h2 style="margin-bottom:10px">Isolation check</h2><p class="muted" style="font-size:13px;margin-bottom:10px">Ask the same question from another team’s project.</p>
       <button class="btn ghost" data-act="iso">Run check</button>${S.isolation?'<p style="margin-top:10px"><span class="chip c-g">Found 0 results</span> <span class="chip c-g">Direct read refused (404)</span></p>':''}</div>
   </div>`;
@@ -520,14 +521,13 @@ function render(){
 }
 async function go(n){
   S.stage=n;S.sel=null;render();
-  if(n===2&&!S.decision){await wait(350);if(S.memory==='on'&&!S.search)doSearch();decide();render()}
+  if(n===2&&!S.decision){await wait(350);if(!S.search)doSearch();decide();render()}
 }
 const showInsp=()=>{if(innerWidth<1180)document.getElementById('insp').scrollIntoView({behavior:'smooth'})};
 document.querySelector('.nav').addEventListener('click',e=>{const b=e.target.closest('[data-page]');if(b){S.page=b.dataset.page;S.sel=null;render()}});
 document.getElementById('lines').addEventListener('click',e=>{const b=e.target.closest('[data-ev]');if(b){S.sel={ev:+b.dataset.ev};inspector();showInsp()}});
 document.addEventListener('click',async e=>{
   const st=e.target.closest('[data-stage]'); if(st) return go(+st.dataset.stage);
-  const m=e.target.closest('[data-mem]'); if(m){S.memory=m.dataset.mem;S.search=null;S.decision=null;render();return}
   const a=e.target.closest('[data-act]');
   if(a){const act=a.dataset.act,d=S.decision;
     if(act==='next') return go(Math.min(STAGES.length,S.stage+1));
@@ -535,12 +535,12 @@ document.addEventListener('click',async e=>{
     if(act==='runA'){await runAgents(true);render();return}
     if(act==='approve'||act==='approveAgain'){approve(d);render();return}
     if(act==='reject'){reject(d);render();return}
-    if(act==='again'){if(S.memory==='on')doSearch();decide();render();return}
+    if(act==='again'){doSearch();decide();render();return}
     if(act==='execute'){execute(d);render();return}
     if(act==='correct'){correct(CORRECTION.reason);render();return}
     if(act==='expire'){expire('fastlr','From an old library version that has since been fixed');render();return}
     if(act==='expireAny'){expire(a.dataset.k,'No longer relevant');render();return}
-    if(act==='rerun'){if(S.memory==='on')doSearch();decide();render();return}
+    if(act==='rerun'){doSearch();decide();render();return}
     if(act==='approveRun'){approve(d);execute(d);render();return}
     if(act==='iso'){log('aggregate','result_vectors','same search from project other-lab · 0 results',{ms:31,docs:0});log('find','results','direct read from other-lab · not found',{ms:3,docs:0});S.isolation=true;render();return}
   }
@@ -550,7 +550,7 @@ document.addEventListener('click',async e=>{
 /* boot: agents have already published; a no-memory baseline exists from rehearsal */
 (async()=>{
   await runAgents(false);
-  S.memory='off'; const d0=decide(); approve(d0); execute(d0); S.memory='on'; S.decision=null; S.search=null;
+  S.receipts.push(BASELINE);
   render();
 })();
 </script>

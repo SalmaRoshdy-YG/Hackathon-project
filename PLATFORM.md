@@ -58,7 +58,7 @@ Use a fresh future timestamp in the harness. `evidence.data.reproduce` is requir
 | `POST /v1/results/{id}/correct` | `{"expected_version":1,"reason":"Receipt was linked to the wrong cohort","replacement":{…full publish body…}}` → 200 `Ref` with version 2. |
 | `POST /v1/results/{id}/expire` | `{"expected_version":1,"reason":"Superseded by newer measurements"}` → 200 `{"result_id":"<uuid>","version":1,"expired":true}`. A scheduled expiry uses the publish timestamp. |
 | `POST /v1/resolve` | `{"refs":[Ref]}` → 200 `{"results":[Result]}` in request order if every ref is current and usable. Validate immediately before dispatch. |
-| `POST /v1/decisions` | Agent B's proposal: `{"request":"…","memory":"on|off","conditions":{…},"candidates":[{"ref":Ref,"score":0.86,"applicability":Applicability}],"job_id":"dict-a-l6","used_refs":[Ref],"skipped_jobs":[{"job_id":"dict-b-l6","reason":"…","refs":[Ref]}],"rejected_candidates":[{"ref":Ref,"reason":"…"}],"reason":"…","model":"gpt-4.1-mini-2025-04-14"}` → 201 `Decision` with `status:"pending"`. 422 if the job is not in the catalog, or a used ref is not current or does not apply. |
+| `POST /v1/decisions` | Agent B's proposal: `{"request":"…","conditions":{…},"candidates":[{"ref":Ref,"score":0.86,"applicability":Applicability}],"job_id":"dict-a-l6","used_refs":[Ref],"skipped_jobs":[{"job_id":"dict-b-l6","reason":"…","refs":[Ref]}],"rejected_candidates":[{"ref":Ref,"reason":"…"}],"reason":"…","model":"gpt-4.1-mini-2025-04-14"}` → 201 `Decision` with `status:"pending"`. 422 if the job is not in the catalog, or a used ref is not current or does not apply. |
 | `GET /v1/decisions/{id}` | → 200 `Decision`. |
 | `POST /v1/decisions/{id}/approve` | `{"note":"Looks right"}` → 200 `Decision` with `status:"approved"`, `decided_by`, `decided_at`. Maintainer only. 409 unless pending. |
 | `POST /v1/decisions/{id}/reject` | `{"reason":"Try the baseline first"}` → 200 `Decision` with `status:"rejected"`. Maintainer only. 409 unless pending. Nothing runs. |
@@ -126,8 +126,8 @@ Demo and rehearsal states run in this order in one project, with the same reques
 
 | State | What changed | Expected recommendation on A holdout | Planning probe |
 | --- | --- | --- | --- |
-| Memory off | B skips search | `plain-l1`, no dictionary | 686/928 |
-| Memory on | — | `dict-a-l6`. Cites the promising finding v1 and the failed approach v1. Skips `dict-b-l6` because dictionary B failed on cohort A. Rejects the cohort B finding as a mismatch. | 238/928 |
+| Agent on its own | Same agent outside Precedent: no token, no search, no approval step | `plain-l1`, no dictionary | 686/928 |
+| With Precedent | — | `dict-a-l6`. Cites the promising finding v1 and the failed approach v1. Skips `dict-b-l6` because dictionary B failed on cohort A. Rejects the cohort B finding as a mismatch. | 238/928 |
 | After correction | Maintainer corrects the promising finding: the receipt belonged to cohort B. v2 is the measured `dict-a-l1` on B calibration (probe 760/928, valid negative). | `plain-l1`. v2 now shows as a cohort mismatch. Dictionary B still skipped because of the failed approach. | 686/928 |
 | After correction and expiry | Maintainer expires the failed approach (“Superseded by newer measurements”). | `plain-l1`. The failed approach is no longer among the candidates and shows as Expired in the UI. `dict-b-l6` is now skipped for lack of applicable evidence instead of a known failure. | 686/928 |
 
@@ -140,7 +140,8 @@ The catalog order is `plain-l1`, `dict-a-l6`, `dict-b-l6`. The no-evidence basel
 P3 owns:
 - `python -m benchmark.run --job dict-a-l6 --cohort A --split holdout`: one measured run, receipt to stdout.
 - `python -m benchmark.publish --out receipts/producer.json`: Agent A's four runs and publishes. Accepts `--project-token-env`.
-- `python -m benchmark.agent --memory on --base-url http://127.0.0.1:8000 --out receipts/on.json`: Agent B searches, decides and posts the proposal. Prints the `decision_id`. Never executes. `--memory off` skips search.
+- `python -m benchmark.agent --base-url http://127.0.0.1:8000 --out receipts/on.json`: Agent B searches, decides and posts the proposal. Prints the `decision_id`. Never executes.
+- `python -m benchmark.agent --standalone --out receipts/baseline.json`: the baseline. The same agent and prompt with no Precedent token and no base URL; it never calls the platform, plans with an empty evidence list, runs its job locally and writes the receipt to a file. The presenter shows this file as “Agent on its own”.
 - `python -m benchmark.execute --decision ID`: runs only if the decision is approved, resolves the cited refs first, runs the registered configuration once, and posts the receipt.
 
 B reads its token from `MEMORY_TOKEN`. Receipts include request, model, catalog and budget, candidates with applicability, selected and skipped jobs, exact used refs, approval, executed configuration, runtime, status, metric, byte counts, hashes and round-trip evidence. The planning arithmetic above came from a local Python 3.11 standard-library probe. Build acceptance requires receipts from the new runner.
@@ -151,11 +152,11 @@ P2 owns `uvicorn demo.presenter:app --host 127.0.0.1 --port 8100`. It serves the
 
 | Route | Does |
 | --- | --- |
-| `GET /demo/state` | Current stage, health from `GET /v1/health`, project, memory setting, findings from `GET /v1/results`, latest decision and receipts. |
+| `GET /demo/state` | Current stage, health from `GET /v1/health`, project, the baseline receipt from `receipts/baseline.json`, findings from `GET /v1/results`, latest decision and receipts. |
 | `GET /demo/events` | Server-sent events: `change` events from the change streams (operation, collection, result or decision ID, version, status) and `atlas` events from the command listener (command, collection, ms, docs, redacted shape). The UI subscribes once on load. |
 | `POST /demo/agent-a` | Runs `benchmark.publish` with A's token. |
-| `POST /demo/agent-b` | `{"memory":"on|off"}`. Runs `benchmark.agent` with B's token. Returns the pending decision. |
-| `POST /demo/rerun` | Repeats B's last request with the same memory setting. |
+| `POST /demo/agent-b` | `{}`. Runs `benchmark.agent` with B's token. Returns the pending decision. |
+| `POST /demo/rerun` | Repeats B's last request. |
 | `POST /demo/decisions/{id}/approve` and `/reject` | Forwards with the maintainer token. |
 | `POST /demo/decisions/{id}/execute` | Runs `benchmark.execute`. |
 | `POST /demo/governance/correct` | `{"result_id":…,"expected_version":…,"reason":…}`. Uses the prepared cohort B replacement from P3's receipt. |
@@ -174,7 +175,7 @@ P4 owns `demo/web/`, a static HTML, CSS and JavaScript bundle served by the pres
 | Demo (default) | Six stages from the demo sequence, with a Next button the presenter controls. Each stage shows agent activity and the evidence cards for that step. Stage 2 shows Agent B's question and groups candidates as applicable success, applicable failure, and doesn't match, with the mismatched field named. Stage 3 has Approve and Reject. Stage 4 shows the measured result against the baseline and the 0.40 target. Stage 5 has Correct and Expire buttons and a Re-run after each. Stage 6 shows the four receipts side by side. |
 | Research | Searchable list from `GET /v1/results` with status (current, expired, superseded count), outcome label, execution label, cohort and conditions, and source agent. A detail view shows evidence, the rerun command, provenance and version history. |
 | Governance | Findings to review, Correct and Expire forms with a required reason, the previous and current versions side by side, and the change history. |
-| Settings | Atlas health, project, memory on/off for Agent B, environment info (model, embedding model, zlib version), and the isolation check button with its result. |
+| Settings | Atlas health, project, agents in the project, how the baseline was recorded, environment info (model, embedding model, zlib version), and the isolation check button with its result. |
 
 **MongoDB on screen.** Two elements make the database's work visible during the whole demo. Both use only live data from `/demo/events`; nothing is hardcoded.
 
