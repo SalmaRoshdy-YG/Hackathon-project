@@ -1,5 +1,12 @@
 # Precedent demo and submission
 
+## Verified live showcase
+
+On November 14, the existing seeded project completed the full browser flow in 80 seconds. Codex proposed reuse, Run plan executed, and Atlas published one new finding. The CPU scratch receipt scored 29.2% (70/240) and the new CPU run reached 90.4% (217/240). The CPU output matched a checkpoint already in this project's GridFS storage, allowing the platform to reuse that blob. This verified one full run on the existing project. Fresh-project uploads and the three-run gate remain open.
+
+For the successful capture, say: “Codex found a checkpoint that matches the 64-pixel task. We approved one run. Precedent retrieved the saved weights, and the new run got 217 of 240 unseen digits right. The scratch baseline got 70. Precedent saved the new finding in Atlas for the next agent.”
+
+
 ## One-minute voice-over for the W3 recording
 
 | Time | On screen | Voice-over |
