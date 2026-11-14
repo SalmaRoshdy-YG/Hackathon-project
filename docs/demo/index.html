@@ -255,7 +255,7 @@ const SEED = [
     settings:'plain 18 vs 34 layers',acc:null,accText:'27.94% → 28.54% error',gpu:'—',dir:'negative',exec:'completed',score:.52,background:true},
 ];
 const CORRECTION = {title:'Saved ResNet-50 was trained on only 100 classes',dataset:'ImageNet-100 (100 classes)',reason:'The checkpoint was trained on a 100-class subset, not the full 1,000 classes'};
-const STAGES = ['Agents discover','MongoDB remembers','New agent recommends','Human approves','Agent trains','Governance','Updated decision'];
+const STAGES = ['Agents discover','New agent recommends','Human approves','Agent trains','Governance','Updated decision'];
 
 let clock = new Date(Date.UTC(2026,10,14,18,38,0));
 const tick = s => { clock = new Date(clock.getTime()+s*1000); return clock.toISOString().slice(11,19); };
@@ -369,14 +369,14 @@ function hl(o){return esc(JSON.stringify(o,null,2)).replace(/(&quot;[^&]*?&quot;
 const resultText=f=>f.acc!=null?pct(f.acc)+' accuracy':(f.accText||'No measurement');
 
 /* ---------- Demo stages ---------- */
-function done(){const g=gov(),L=S.receipts.map(r=>r.label);return [S.order.length===SEED.length,!!S.search,!!S.decision,!!S.decision&&S.decision.status!=='pending',L.includes('With memory'),g.corrected&&g.expired,L.length>=4]}
+function done(){const g=gov(),L=S.receipts.map(r=>r.label);return [S.order.length===SEED.length,!!S.decision,!!S.decision&&S.decision.status!=='pending',L.includes('With memory'),g.corrected&&g.expired,L.length>=4]}
 function demoPage(){
   const dn=done();
   return `<div class="stepper">${STAGES.map((s,i)=>`<button data-stage="${i+1}" class="${dn[i]?'done':''}" ${S.stage===i+1?'aria-current="step"':''} aria-label="Stage ${i+1}: ${s}"><span class="dotn">${dn[i]&&S.stage!==i+1?'✓':i+1}</span><span class="lbl">${s}</span></button>`).join('')}</div>
-  <div><div class="eyebrow">Stage ${S.stage} of 7</div><h1>${STAGES[S.stage-1]}</h1></div>
-  ${[st1,st2,st3,st4,st5,st6,st7][S.stage-1]()}
+  <div><div class="eyebrow">Stage ${S.stage} of ${STAGES.length}</div><h1>${STAGES[S.stage-1]}</h1></div>
+  ${[st1,st3,st4,st5,st6,st7][S.stage-1]()}
   ${S.toast?`<div class="toast" role="status">${esc(S.toast)}</div>`:''}
-  <div class="stagebar">${S.stage>1?'<button class="btn ghost" data-act="prev">Back</button>':''}${S.stage<7?'<button class="btn" data-act="next">Next</button>':''}</div>`;
+  <div class="stagebar">${S.stage>1?'<button class="btn ghost" data-act="prev">Back</button>':''}${S.stage<STAGES.length?'<button class="btn" data-act="next">Next</button>':''}</div>`;
 }
 const st1=()=>`<p class="lede">Agents from different teams trained image models before. Each saved what it learned, including what failed and what crashed, and the best model weights.</p>
   <div class="fcards">${S.order.map(k=>S.findings[k]).map(f=>`<button class="fcard" data-f="${f.key}"><span class="t">${esc(f.title)}</span><span class="chips">${label(f)}${f.weights?' <span class="chip c-g">Weights saved</span>':''}${f.background?' <span class="chip c-line">From the paper</span>':''}</span>${f.acc!=null?bar(f.acc):''}<span class="s">${resultText(f)}</span>${who(f)}</button>`).join('')}</div>
@@ -394,17 +394,20 @@ function st2(){
 function st3(){
   const d=S.decision; if(!d) return '<p class="muted">Thinking…</p>';
   const col=(t,c,list,why)=>`<div class="group"><h4 style="color:${c}">${t}</h4>${list.map(x=>`<button class="ev" data-f="${x.f.key}"><span class="t">${esc(x.f.title)}</span><span class="r">${why(x)}</span></button>`).join('')||'<span class="muted" style="font-size:13px">None</span>'}</div>`;
-  return `<p class="lede">MongoDB marks which results fit this task: ResNet-50, ImageNet, full-size images. The agent uses them to pick one plan.</p>
+  const drop=S.search&&d.memory==='on'?S.search.dropped:[];
+  return `<div class="card"><div class="agent" style="margin-bottom:8px"><span class="av b">N</span><b>A new agent asks</b><span class="chip c-line">never talked to the other agents</span></div><p class="quote">“${REQUEST}”</p></div>
+  ${d.memory==='off'?'<p class="lede">Memory is turned off in Settings, so it starts from nothing.</p>':`<p class="lede">It searches the shared memory and sorts what it finds for this task: ResNet-50, ImageNet, full-size images.</p>`}
   ${d.memory==='on'?`<div class="grid3">
     ${col('Fits and worked','var(--pos)',d.cands.filter(c=>c.applies&&c.f.dir==='positive'),c=>pct(c.f.acc)+', weights saved')}
     ${col('Fits and failed','var(--neg)',d.cands.filter(c=>c.applies&&c.f.dir==='negative'),c=>'Collapsed to '+pct(c.f.acc))}
-    ${col('Doesn’t fit','var(--bad)',d.cands.filter(c=>!c.applies),c=>'Trained on '+c.f.dataset.split(' (')[0]+', '+c.f.image)}</div>`:''}
+    ${col('Doesn’t fit','var(--bad)',d.cands.filter(c=>!c.applies),c=>'Trained on '+c.f.dataset.split(' (')[0]+', '+c.f.image)}</div>
+    ${drop.length?`<p class="muted" style="font-size:13px">Left out: ${drop.map(c=>esc(c.f.title)+' ('+c.why+')').join(', ')}.</p>`:''}`:''}
   <div class="card"><div class="rec"><div class="job"><b style="font-family:var(--f-display);font-size:17px">${JOBS[d.job].label}</b><small>${JOBS[d.job].desc}</small></div>
     <div class="why"><p>${esc(d.reason)}</p><p class="muted" style="font-size:13px">Based on: ${d.used.map(ref).join(' ')||'no evidence'}</p></div></div></div>
-  ${mongo(d.memory==='on'?'The fit check against the task happened <b>inside the same search query</b>, so the CIFAR-10 result arrived already marked “doesn’t fit”.':'No search ran. The recommendation is saved and waits for approval.')}`;
+  ${mongo(d.memory==='on'?`<b>Atlas Vector Search</b> found the other agents’ work by meaning, inside this project only, in ${S.search?S.search.ms:'~40'} ms. The same query checked each result is still current and marked what fits, so the CIFAR-10 model arrived already labelled “doesn’t fit”.`:'No search ran. The recommendation is saved and waits for approval.')}`;
 }
 function st4(){
-  const d=S.decision; if(!d) return '<p class="muted">Go back to stage 3 first.</p>';
+  const d=S.decision; if(!d) return '<p class="muted">Go back to stage 2 first.</p>';
   return `<p class="lede">A person checks the plan before any GPU time is spent.</p>
   <div class="card"><div class="rec"><div class="job"><b style="font-family:var(--f-display);font-size:17px">${JOBS[d.job].label}</b><small>${JOBS[d.job].desc}</small></div><div class="why"><p>${esc(d.reason)}</p></div></div>
     <div class="row" style="margin-top:16px">${d.status==='pending'?'<button class="btn" data-act="approve">Approve</button><button class="btn danger" data-act="reject">Reject</button>'
@@ -414,7 +417,7 @@ function st4(){
 }
 function st5(){
   const d=S.decision, r=d&&d.receipt, base=S.receipts.find(x=>x.label==='Without memory');
-  if(!d||d.status==='pending'||d.status==='rejected') return `<p class="lede">${d&&d.status==='rejected'?'The plan was rejected, so nothing trains.':'Waiting for approval at stage 4.'}</p>`;
+  if(!d||d.status==='pending'||d.status==='rejected') return `<p class="lede">${d&&d.status==='rejected'?'The plan was rejected, so nothing trains.':'Waiting for approval at stage 3.'}</p>`;
   if(!r) return `<p class="lede">The approved plan runs within the 8 GPU-hour budget.</p><div class="row"><button class="btn" data-act="execute">Start training</button></div>
     ${mongo(d.job==='warm-start'?'The saved weights will stream out of Atlas with <b>GridFS</b>, after a last check that nobody corrected or expired them.':'Training starts from random weights.')}`;
   return `<p class="lede">Same task, same budget. One run started from memory, the other trained blind.</p>
@@ -498,7 +501,7 @@ function inspector(){
     <div class="isec" style="margin-top:12px"><dl class="kv"><dt>time</dt><dd>${e.ms!=null?e.ms+' ms':'—'}</dd><dt>documents</dt><dd>${e.docs??'—'}</dd></dl></div>
     ${e.shape?`<div class="isec"><h4>What ran (simplified)</h4><pre class="code">${hl(e.shape)}</pre></div>`:''}`;return}
   const d=S.decision;
-  if(S.page==='demo'&&d&&S.stage>=3&&S.stage<=6){
+  if(S.page==='demo'&&d&&S.stage>=2&&S.stage<=5){
     el.innerHTML=`<div class="eyebrow">Recommendation ${d.id}</div><h2>${JOBS[d.job].label}</h2><div class="chips"><span class="chip ${d.status==='rejected'?'c-bad':d.status==='pending'?'c-b':'c-pos'}">${d.status}</span></div>
     <div class="isec" style="margin-top:14px"><h4>Why</h4><p style="font-size:14px">${esc(d.reason)}</p></div>
     <div class="isec"><h4>Evidence used</h4>${d.used.length?d.used.map(f=>`<div>${ref(f)} <span style="font-size:13px">${esc(f.title)}</span></div>`).join(''):'<span class="muted">None</span>'}</div>
@@ -517,8 +520,7 @@ function render(){
 }
 async function go(n){
   S.stage=n;S.sel=null;render();
-  if(n===2&&S.memory==='on'&&!S.search&&!S.decision){await wait(350);doSearch();render()}
-  if(n===3&&!S.decision){await wait(250);decide();render()}
+  if(n===2&&!S.decision){await wait(350);if(S.memory==='on'&&!S.search)doSearch();decide();render()}
 }
 const showInsp=()=>{if(innerWidth<1180)document.getElementById('insp').scrollIntoView({behavior:'smooth'})};
 document.querySelector('.nav').addEventListener('click',e=>{const b=e.target.closest('[data-page]');if(b){S.page=b.dataset.page;S.sel=null;render()}});
@@ -528,7 +530,7 @@ document.addEventListener('click',async e=>{
   const m=e.target.closest('[data-mem]'); if(m){S.memory=m.dataset.mem;S.search=null;S.decision=null;render();return}
   const a=e.target.closest('[data-act]');
   if(a){const act=a.dataset.act,d=S.decision;
-    if(act==='next') return go(Math.min(7,S.stage+1));
+    if(act==='next') return go(Math.min(STAGES.length,S.stage+1));
     if(act==='prev') return go(Math.max(1,S.stage-1));
     if(act==='runA'){await runAgents(true);render();return}
     if(act==='approve'||act==='approveAgain'){approve(d);render();return}

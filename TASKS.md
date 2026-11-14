@@ -58,7 +58,7 @@ The plan allocates 45 minutes from the first live handoff to lifecycle checks, 3
 ## Demo sequence
 
 - **One-minute recording.** Keep the Atlas activity strip in frame throughout. 0–8s Agent A's findings streaming in live, including the crash label. 8–20s B's paraphrased Atlas search with applies and doesn't-match labels. 20–28s B's recommendation and the human approving it. 28–38s measured result against the memory-off baseline. 38–52s correct one finding, rerun, recommendation changes; expire another, rerun, evidence changes. 52–60s the four receipts side by side and the public repo.
-- **Three-minute live demo.** Follow the seven Demo stages and read each stage’s “In MongoDB” callout aloud in one sentence. 0–20s Agent A discovers. 20–50s MongoDB remembers and B retrieves by meaning. 50–80s B recommends; point at the rejected cohort B finding. 80–95s approve. 95–115s execute and compare with the baseline. 115–155s correct, rerun, expire, rerun, and open the history. 155–170s updated decision and the isolation check in Settings. Keep the final ten seconds for questions or delays.
+- **Three-minute live demo.** Follow the six Demo stages and read each stage’s “In MongoDB” callout aloud in one sentence. 0–20s Agent A discovers. 20–80s B asks, retrieves by meaning and recommends; point at the rejected cohort B finding. 80–95s approve. 95–115s execute and compare with the baseline. 115–155s correct, rerun, expire, rerun, and open the history. 155–170s updated decision and the isolation check in Settings. Keep the final ten seconds for questions or delays.
 
 ## Handoffs
 

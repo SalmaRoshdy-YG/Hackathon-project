@@ -8,7 +8,7 @@ We’re building a shared research memory on MongoDB Atlas where AI agents save 
 
 One live research handoff on a tiny experiment that runs in seconds with no model training: making short messages as small as possible. Agent A publishes findings, a fresh Agent B finds them by meaning, skips what failed and ignores a finding from another cohort, a human approves, the job runs and is measured, and then a correction and an expiry visibly change B’s next recommendation. [Demo sequence](REQUIREMENTS.md#demo-sequence) · [Interface](PLATFORM.md#user-interface)
 
-- **Clickable demo:** open [docs/demo/index.html](docs/demo/index.html) in a browser. It simulates the seven stages with mockup data for the proposed ResNet-50 example (agents sharing results and saved weights) so everyone can rehearse before the real app exists. The contract in PLATFORM.md still describes the compression benchmark until the team confirms the switch.
+- **Clickable demo:** open [docs/demo/index.html](docs/demo/index.html) in a browser. It simulates the six stages with mockup data for the proposed ResNet-50 example (agents sharing results and saved weights) so everyone can rehearse before the real app exists. The contract in PLATFORM.md still describes the compression benchmark until the team confirms the switch.
 - **Pitch deck:** [docs/deck/precedent-deck.pptx](docs/deck/precedent-deck.pptx), 12 slides with speaker notes. Statistics on slide 2 are cited on the slide.
 
 ## Start here

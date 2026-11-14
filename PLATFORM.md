@@ -171,7 +171,7 @@ P4 owns `demo/web/`, a static HTML, CSS and JavaScript bundle served by the pres
 
 | Page | Contents |
 | --- | --- |
-| Demo (default) | Seven stages from the demo sequence, with a Next button the presenter controls. Each stage shows agent activity and the evidence cards for that step. Stage 3 groups candidates as applicable success, applicable failure, and doesn't match, with the mismatched field named. Stage 4 has Approve and Reject. Stage 5 shows the measured result against the baseline and the 0.40 target. Stage 6 has Correct and Expire buttons and a Re-run after each. Stage 7 shows the four receipts side by side. |
+| Demo (default) | Six stages from the demo sequence, with a Next button the presenter controls. Each stage shows agent activity and the evidence cards for that step. Stage 2 shows Agent B's question and groups candidates as applicable success, applicable failure, and doesn't match, with the mismatched field named. Stage 3 has Approve and Reject. Stage 4 shows the measured result against the baseline and the 0.40 target. Stage 5 has Correct and Expire buttons and a Re-run after each. Stage 6 shows the four receipts side by side. |
 | Research | Searchable list from `GET /v1/results` with status (current, expired, superseded count), outcome label, execution label, cohort and conditions, and source agent. A detail view shows evidence, the rerun command, provenance and version history. |
 | Governance | Findings to review, Correct and Expire forms with a required reason, the previous and current versions side by side, and the change history. |
 | Settings | Atlas health, project, memory on/off for Agent B, environment info (model, embedding model, zlib version), and the isolation check button with its result. |
@@ -184,12 +184,11 @@ P4 owns `demo/web/`, a static HTML, CSS and JavaScript bundle served by the pres
 | Stage | What the callout shows |
 | --- | --- |
 | 1 Agent A discovers | Four `insert` commands and their change-stream events arriving; findings appear in the list live. |
-| 2 MongoDB remembers | The `$vectorSearch` aggregate with the `project_id` filter, the paraphrased question, hits and latency. |
-| 3 Agent B recommends | The same pipeline's `$lookup` and applicability stages: which hits matched the live record, and the cohort mismatch computed in the database. |
-| 4 Human approves | The conditional `findOneAndUpdate` from `pending` to `approved`, and the 409 on a second click. |
-| 5 Agent B executes | `resolve` re-reading the cited versions, then the receipt `update` and its change event. |
-| 6 Governance | The correction transaction (head replaced, old version copied to `result_versions`), the expiry `update` of `expires_at`, and the stale index entry still present but dropped by the `$lookup`. TTL `purge_at` shown as future cleanup that nothing waits on. |
-| 7 Updated decision | Side-by-side receipts with the exact versions each run read from Atlas. |
+| 2 Agent B recommends | The `$vectorSearch` aggregate with the `project_id` filter, hits and latency, and the same pipeline's `$lookup` and applicability stages: which hits matched the live record, and the cohort mismatch computed in the database. |
+| 3 Human approves | The conditional `findOneAndUpdate` from `pending` to `approved`, and the 409 on a second click. |
+| 4 Agent B executes | `resolve` re-reading the cited versions, then the receipt `update` and its change event. |
+| 5 Governance | The correction transaction (head replaced, old version copied to `result_versions`), the expiry `update` of `expires_at`, and the stale index entry still present but dropped by the `$lookup`. TTL `purge_at` shown as future cleanup that nothing waits on. |
+| 6 Updated decision | Side-by-side receipts with the exact versions each run read from Atlas. |
 
 Settings shows the isolation check as two real commands: the same `$vectorSearch` with the other project's filter returning nothing, and the direct `find` returning no document.
 

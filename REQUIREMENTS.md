@@ -51,7 +51,7 @@ A polished web app the presenter drives. Judges should not need to explore it th
 
 - **Look:** inspired by MongoDB: dark green sidebar, light workspace, restrained green accents. Use our own product name and logo, not MongoDB's. Show the Atlas connection without exposing database internals.
 - **Sidebar:**
-  - **Demo** (default): a guided seven-stage flow with agent activity and evidence, Approve and Reject, the execution result, and governance replay.
+  - **Demo** (default): a guided six-stage flow with agent activity and evidence, Approve and Reject, the execution result, and governance replay.
   - **Research:** a searchable list of findings with status, outcome, cohort and conditions, source agent, and a detail view with provenance and version history.
   - **Governance:** findings to review, Correct and Expire actions, previous and current versions, change history.
   - **Settings:** Atlas connection status, current project, memory on/off, demo environment info, and an isolation check.
@@ -66,12 +66,11 @@ Each stage names what MongoDB did, shown live from the real commands.
 | Stage | What happens | What MongoDB does on screen |
 | --- | --- | --- |
 | 1. Agent A discovers | A publishes a success, a failure, a finding from another cohort, and a crash. | Inserts land and stream into the UI live through change streams. |
-| 2. MongoDB remembers | A fresh Agent B retrieves A's findings by meaning. | Atlas Vector Search, filtered to this project inside the query. |
-| 3. Agent B recommends | Applicable, failed and mismatched evidence, then the recommendation. | The same query checks each hit against the live record and labels the cohort mismatch. |
-| 4. Human approves | Approve, or reject. | An atomic update approves exactly once; a second click is refused. |
-| 5. Agent B executes | The job runs and is compared with the baseline. | Cited versions are re-read right before running; the receipt is stored and streamed. |
-| 6. Governance | Correct one finding and rerun; expire another and rerun. | A transaction keeps v1 in history and makes v2 current. The old search entry is still in the index but the query drops it. Expiry hides the finding instantly; TTL cleanup comes later and nothing waits on it. |
-| 7. Updated decision | How the evidence and recommendation changed. | Each receipt lists the exact versions it read from Atlas. |
+| 2. Agent B recommends | A fresh Agent B asks in its own words, sees applicable, failed and mismatched evidence, then recommends. | Atlas Vector Search finds A's findings by meaning inside this project; the same query checks each hit against the live record and labels the cohort mismatch. |
+| 3. Human approves | Approve, or reject. | An atomic update approves exactly once; a second click is refused. |
+| 4. Agent B executes | The job runs and is compared with the baseline. | Cited versions are re-read right before running; the receipt is stored and streamed. |
+| 5. Governance | Correct one finding and rerun; expire another and rerun. | A transaction keeps v1 in history and makes v2 current. The old search entry is still in the index but the query drops it. Expiry hides the finding instantly; TTL cleanup comes later and nothing waits on it. |
+| 6. Updated decision | How the evidence and recommendation changed. | Each receipt lists the exact versions it read from Atlas. |
 
 ## Out of scope for the hackathon
 
@@ -93,7 +92,7 @@ These come from the original business goals and stay on the roadmap:
 ## Decisions log
 
 - **November 14, 2026: build our own platform.** We don't run or adapt ARA or AutoSci. ARA's idea of keeping dead ends as first-class records with a reason, and AutoSci's list of failed ideas not to revisit, inspired R1 and R4 and are credited in [PLATFORM.md](PLATFORM.md#credits).
-- **November 14, 2026: follow the team requirements list.** One domain, one guided handoff, human approval, both governance events live, and visible version history. Where the team list was silent, the brief's requirements were added: project isolation (R10), paraphrased search (R2), stale search hits dropped (R7, R8), and the exact versions cited in each decision (R4). The team list mentioned both a "six-stage workflow" and seven demo steps; we use seven.
+- **November 14, 2026: follow the team requirements list.** One domain, one guided handoff, human approval, both governance events live, and visible version history. Where the team list was silent, the brief's requirements were added: project isolation (R10), paraphrased search (R2), stale search hits dropped (R7, R8), and the exact versions cited in each decision (R4). The team list mentioned both a "six-stage workflow" and seven demo steps; we use six, folding "MongoDB remembers" into "Agent B recommends" because retrieval is part of the recommendation, not something the audience watches on its own. MongoDB stays visible at every stage through the Atlas activity strip and the per-stage callouts.
 
 ## Definition of done
 
