@@ -67,3 +67,16 @@ Add a short entry with task ID, status, branch or commit, exact check and observ
 Kickoff evidence includes the local Python 3.11 compression probe and the pinned upstream source inspection. On November 14 the team adopted its own requirements list (one domain, human approval, both governance events live, version history) and dropped ResNet, open experiments and ARA/AutoSci adapters from the MVP; see [REQUIREMENTS.md](REQUIREMENTS.md#decisions-log). Pending from P1 are event Sandbox access, index queryability and embeddings. Pending from P3 is the planner credential check. Pending from P4 are event checkout and submission access.
 
 **First implementation task.** P1 starts Sandbox preflight at 10:45 a.m. Pass when the real API query returns the authorized project's sentinel and the second project's query returns its own sentinel while excluding the first project's result and evidence. Index creation and application work can proceed in parallel while the query becomes ready.
+
+
+### Backend handoff
+
+Backend branch: `backend/precedent-mongo`. See [BACKEND.md](BACKEND.md) for the startup commands, presenter API, event shapes, and integration path. The static mockup and pitch deck are unchanged.
+
+| Workstream | Verification and observed result |
+| --- | --- |
+| P1 Atlas | `python -m platform_api.preflight` passed against the event Sandbox. Each project saw its own same-text sentinel. Cross-project reads and writes were denied. Superseded, manually expired and scheduled-expiry refs were blocked while the vectors and TTL records still existed. The correction transaction preserved history and an approved decision with a revoked citation aborted. |
+| P2 Presenter | `python -m demo.check_presenter --out receipts/presenter-final` passed all four browser API runs, rejection, state and history, and isolation. It verified real redacted vector search, atomic approval, correction transaction and expiry events. Approval, correction and expiry were delivered to the browser client in 266, 547 and 204 ms respectively. |
+| P3 Runner | `python -m unittest discover -s tests -v` verified the calibration and holdout matrix, round trips, crash semantics and receipt metadata. |
+| P3/P4 Rehearsal | `python -m demo.rehearse --out receipts/rehearsal` and two more fresh projects yielded 686 / 238 / 686 / 686 bytes, with exact citations, changed skip reasons and no receipt for rejection. Concurrent approval and dispatch admitted one winner each. |
+| Pending | Frontend owner connects their build to the presenter and verifies the guided interface. The working backend uses BGE plus the rules planner; live checks of the optional OpenAI mode need a team API key. |

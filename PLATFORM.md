@@ -1,18 +1,18 @@
 # Platform contract
 
-This is the technical contract for [REQUIREMENTS.md](REQUIREMENTS.md) (R1–R11). One live research handoff on a fast CPU benchmark: Agent A publishes measured findings, a fresh Agent B finds them through event Atlas Vector Search, the platform labels which ones apply, B recommends a job, a human approves, the job runs, and human corrections and expiry change B's next recommendation. The same contract can support more agents and studies later through project membership, versioned results, and new job catalogs.
+This is the technical contract for [REQUIREMENTS.md](REQUIREMENTS.md) (R1–R12). One live research handoff on a fast CPU benchmark: Agent A publishes measured findings, a fresh Agent B finds them through event Atlas Vector Search, the platform labels which ones apply, B recommends a job, a human approves, the job runs, and human corrections and expiry change B's next recommendation. The same contract can support more agents and studies later through project membership, versioned results, and new job catalogs.
 
 We build our own platform. No ARA or AutoSci code, runtime or adapter is on the build path. See [Credits](#credits).
 
 ## Shared entry point
 
-Use Python 3.11, FastAPI and PyMongo. P1 owns `uvicorn platform_api.app:app --host 127.0.0.1 --port 8000` and the HTTP JSON contract below. P2 owns the presenter service that serves the UI and drives the demo (see [Presenter service](#presenter-service)). Callers can work against a stub serving these payloads until the real service is up. P4 owns the top-level rehearsal. All commands in this plan are implementation targets.
+Use Python 3.11, FastAPI and PyMongo. P1 owns `uvicorn platform_api.app:app --host 127.0.0.1 --port 8000` and the HTTP JSON contract below. P2 owns the presenter service that serves the UI and drives the demo (see [Presenter service](#presenter-service)). Callers can work against a stub serving these payloads until the real service is up. P4 owns the top-level rehearsal. Backend startup and the live frontend handoff are in [BACKEND.md](BACKEND.md).
 
 The service maps opaque bearer tokens in server-side `MEMORY_TOKENS_JSON` to a trusted `project_id`, `agent_id`, and `role`. Example mapping entry: `{"<publisher-token>":{"project_id":"team-run-01","agent_id":"agent-a","role":"publisher"}}`. Issue a publisher token for Agent A, a reader token for Agent B, a maintainer token for the human (corrections, expiry, approval), and a reader in a second project for the isolation check. Rehearsals use fresh project IDs in the same Atlas database and index. Each process receives only its own token. Atlas and provider credentials stay with the service and the trusted runner. Tokens never reach the browser. The service sets project and author from the token and rejects caller-supplied identity fields.
 
 | Role | Can |
 | --- | --- |
-| reader | search, read current results and evidence, list findings, read history, resolve, propose a decision, record a run receipt for an approved decision |
+| reader | search, read current results and evidence, list findings, read history, resolve, propose a decision, execute its own approved decision |
 | publisher | reader rights, plus publish, and correct or expire its own records |
 | maintainer | reader rights, plus publish, correct and expire any record in the project, approve or reject decisions |
 
@@ -62,29 +62,32 @@ Use a fresh future timestamp in the harness. `evidence.data.reproduce` is requir
 | `GET /v1/decisions/{id}` | → 200 `Decision`. |
 | `POST /v1/decisions/{id}/approve` | `{"note":"Looks right"}` → 200 `Decision` with `status:"approved"`, `decided_by`, `decided_at`. Maintainer only. 409 unless pending. |
 | `POST /v1/decisions/{id}/reject` | `{"reason":"Try the baseline first"}` → 200 `Decision` with `status:"rejected"`. Maintainer only. 409 unless pending. Nothing runs. |
-| `POST /v1/decisions/{id}/receipt` | The runner's measured receipt → 201 `Decision` with `status:"executed"` and the receipt attached. 409 unless approved and not yet executed. If the runner's resolve failed, it posts `{"aborted":true,"reason":"…"}` and the decision becomes `aborted`. |
+| `POST /v1/decisions/{id}/execute` | The platform claims the approved decision atomically, rechecks citations and executes the registered job locally. Returns 201 `Decision` with `status:"executed"` and a server-generated receipt, or `status:"aborted"` without a run if citations were revoked. 409 unless approved and unclaimed. Only the proposer or a maintainer may dispatch. |
+| `POST /v1/decisions/{id}/receipt` | Compatibility alias for trusted execution; caller-supplied measurements are not stored. |
+| `GET /v1/decisions` | Recent decisions scoped to the project, including receipts. |
+| `GET /v1/activity` | Authenticated internal SSE endpoint supplying real PyMongo command events to the presenter. |
 
-`Decision` is the proposal plus `decision_id`, `project_id`, `proposed_by`, `status` (`pending|approved|rejected|executed|aborted`), `decided_by`, `decided_at`, `note` or `reason`, and `receipt`.
+`Decision` is the proposal plus `decision_id`, `project_id`, `proposed_by`, `status` (`pending|approved|rejected|running|executed|aborted`), `decided_by`, `decided_at`, `note` or `reason`, and `receipt`.
 
-Use 401 for missing or unknown token, 403 for role denial on visible records, 404 for absent, out-of-scope, expired or historical reads on agent paths and unusable resolve refs, 409 for a stale write or a decision in the wrong state, 422 for invalid bodies, and 503 for unavailable search. A resolve failure aborts dispatch and allows one fresh search and decision within the same job budget. Fail closed on authorization, dependency or validation errors. Token roles and source fields are kept distinct.
+Use 401 for missing or unknown token, 403 for role denial on visible records, 404 for absent, out-of-scope, expired or historical reads on agent paths and unusable resolve refs, 409 for a stale write or a decision in the wrong state, 422 for invalid bodies, and 503 for unavailable search. A resolve failure aborts dispatch without running the job; the human can review a fresh proposal. Fail closed on authorization, dependency or validation errors. Token roles and source fields are kept distinct.
 
 ## Atlas storage and lifecycle
 
 - `MEMORY_ATLAS_URI` and `MEMORY_ATLAS_DB` point to the event Sandbox. `results` holds the authoritative current head keyed by UUID with `project_id`, `author_id`, `version`, `search_key`, normalized fields, inline evidence, `expires_at`, `purge_at` and an `events` array (actor, time, action, version, reason). Each correction copies the current head into `result_versions` and replaces the head, in one transaction conditional on project, current version and active expiry. Manual expiry atomically sets `expires_at` to service time and appends an event. The original publisher keeps ownership.
 - `result_versions` holds superseded payloads and their evidence keyed by `(result_id, version)`, with `project_id` and `purge_at`. Only the history route reads it.
-- `result_vectors` holds immutable search entries keyed by a generated `search_key` with `project_id`, `result_id`, `version`, `embedding`, `embedding_model`, and `purge_at`. Stage the vector before committing the head. A candidate is accepted only if its key and version match the authoritative head. An orphan or old key is inert and eligible for cleanup. The `research_memory_v1` index has a 1536-dimensional cosine vector field `embedding` and a filter field `project_id`. Embed hypothesis, summarized measurement, fixture and conditions using `text-embedding-3-small` at 1536 dimensions, and embed the search question with the same model. Service secrets use `OPENAI_API_KEY`. [Embedding model](https://developers.openai.com/api/docs/models/text-embedding-3-small)
-- **Search is one Atlas aggregation.** MongoDB, not Python, does retrieval, isolation, the stale-version check, expiry and applicability in a single `aggregate` on `result_vectors`. Python only embeds the question and passes the task conditions in. Recheck lifecycle at direct read, evidence read, resolve, decision create and receipt with equivalent `find` filters on `$$NOW`. Both projects get their own sentinel in the selectivity test. [Atlas Vector Search](https://www.mongodb.com/docs/vector-search/query/aggregation-stages/vector-search-stage/) · [$lookup](https://www.mongodb.com/docs/manual/reference/operator/aggregation/lookup/)
+- `result_vectors` holds immutable search entries keyed by a generated `search_key` with `project_id`, `result_id`, `version`, `embedding`, `embedding_model`, and `purge_at`. Stage the vector before committing the head. A candidate is accepted only if its key and version match the authoritative head. An orphan or old key is inert and eligible for cleanup. The `research_memory_v1` index has a 1536-dimensional cosine vector field `embedding` and filter fields `project_id` and `embedding_model`. Embed hypothesis, summarized measurement, fixture and conditions using `text-embedding-3-small` at 1536 dimensions, and embed the search question with the same model. Service secrets use `OPENAI_API_KEY`. The verified key-free path uses BGE CPU embeddings with zero padding in a separate `research_memory_local_v1` index. Both paths execute the same Atlas aggregation. [Embedding model](https://developers.openai.com/api/docs/models/text-embedding-3-small)
+- **Search is one Atlas aggregation.** MongoDB, not Python, does retrieval, isolation, the stale-version check, expiry and applicability in a single `aggregate` on `result_vectors`. Python only embeds the question and passes the task conditions in. Recheck lifecycle at direct read, evidence read, resolve, decision create and dispatch with equivalent MongoDB filters on `$$NOW`. Both projects get their own sentinel in the selectivity test. [Atlas Vector Search](https://www.mongodb.com/docs/vector-search/query/aggregation-stages/vector-search-stage/) · [$lookup](https://www.mongodb.com/docs/manual/reference/operator/aggregation/lookup/)
 
 ```js
 db.result_vectors.aggregate([
   { $vectorSearch: { index: "research_memory_v1", path: "embedding", queryVector: q,
-      filter: { project_id: P },              // isolation, from the token
+      filter: { project_id: P, embedding_model: M },              // isolation, from the token
       exact: true, limit: 12 } },             // ANN fallback: numCandidates 240
   { $addFields: { score: { $meta: "vectorSearchScore" } } },
-  { $lookup: { from: "results", let: { id: "$result_id", v: "$version" }, as: "head",
+  { $lookup: { from: "results", let: { id: "$result_id", v: "$version", key: "$_id" }, as: "head",
       pipeline: [ { $match: { $expr: { $and: [
         { $eq: ["$_id", "$$id"] }, { $eq: ["$project_id", P] },
-        { $eq: ["$version", "$$v"] },          // stale index entry → no match
+        { $eq: ["$version", "$$v"] }, { $eq: ["$search_key", "$$key"] }, // rejects stale entries
         { $gt: ["$expires_at", "$$NOW"] },     // expired → no match, before TTL runs
         { $eq: ["$execution", "completed"] }, { $eq: ["$validity", "valid"] } ] } } },
         { $project: { evidence: 0 } } ] } },
@@ -102,7 +105,7 @@ db.result_vectors.aggregate([
 - **Change streams drive the live UI.** The presenter opens one change stream on `results` and one on `decisions`, each with a `$match` on `fullDocument.project_id` (use `fullDocument: "updateLookup"`). Every publish, correction, expiry, approval and receipt reaches the UI within a second without polling. The UI never reloads to show new findings. [Change streams](https://www.mongodb.com/docs/manual/changeStreams/)
 - **Atlas activity is captured, not described.** The platform registers a PyMongo `CommandListener` that records each command's name, collection, duration in ms, documents returned, and a redacted command shape (query vector shown as `[1536 floats]`, no URIs or tokens). The presenter serves it on `/demo/events`. [Command monitoring](https://pymongo.readthedocs.io/en/stable/api/pymongo/monitoring.html)
 - Preflight confirms the event Sandbox supports `$vectorSearch` with a filter field, `$lookup` after `$vectorSearch`, multi-document transactions, change streams and TTL indexes. If change streams are unavailable on the Sandbox tier, the presenter polls `results` and `decisions` by `updated_at` every 500 ms and the UI labels the panel “polling”.
-- `decisions` holds one document per decision. Approve, reject and receipt are conditional updates on `status`, so a decision can't be approved twice or executed without approval.
+- `decisions` holds one document per decision. Approve, reject, dispatch and receipt are conditional updates on `status`, so a decision can't be approved twice or executed without approval.
 - Expiry hides the record from every agent path immediately. TTL on each collection's BSON Date `purge_at` with `expireAfterSeconds: 0` is asynchronous cleanup: heads and vectors get `expires_at + 24h`, history entries get the head's purge date. Best-effort deletion of a retired vector after correction or expiry can shorten retention. The API stays correct if deletion or TTL lags. [Atlas TTL](https://www.mongodb.com/docs/manual/core/index-ttl/)
 
 ## Benchmark and agent decision
@@ -135,15 +138,15 @@ The job changes once (on → after correction). The expiry changes the evidence 
 
 The third candidate, `dict-b-l6`, measured 760/928 on A holdout in the probe. Measure it during fixture validation so every candidate is accounted for. Each finding should land on the expected side of the threshold. Byte counts can vary by zlib version, which the runner records.
 
-The catalog order is `plain-l1`, `dict-a-l6`, `dict-b-l6`. The no-evidence baseline is the dictionary-free job because it assumes no shared receiver vocabulary. B fetches each candidate's versioned evidence before deciding and attaches the measurement and the platform's applicability label to the model context. Use one stateless `gpt-4.1-mini-2025-04-14` Responses request per decision with a JSON schema for `job_id`, `used_refs`, `skipped_jobs` with reasons and refs, `rejected_candidates` with refs and reasons, and `reason`. Instructions favor a bounded follow-up with applicable support, then the baseline. Level 1 supports testing the same dictionary family at level 6. A valid negative discourages repeating that dictionary family under the same conditions and is advisory across compression levels. Only results labelled `applies` may appear in `used_refs` or as reasons for skips; the platform rejects the decision otherwise. Keep mismatched refs in `rejected_candidates`. [Planner model](https://developers.openai.com/api/docs/models/gpt-4.1-mini)
+The catalog order is `plain-l1`, `dict-a-l6`, `dict-b-l6`. The no-evidence baseline is the dictionary-free job because it assumes no shared receiver vocabulary. B fetches each candidate's versioned evidence before deciding and attaches the measurement and the platform's applicability label to the model context. In OpenAI mode, use one stateless `gpt-4.1-mini-2025-04-14` Responses request per decision with a JSON schema for `job_id`, `used_refs`, `skipped_jobs` with reasons and refs, `rejected_candidates` with refs and reasons, and `reason`. Instructions favor a bounded follow-up with applicable support, then the baseline. Level 1 supports testing the same dictionary family at level 6. A valid negative discourages repeating that dictionary family under the same conditions and is advisory across compression levels. Only results labelled `applies` may appear in `used_refs` or as reasons for skips; the platform rejects the decision otherwise. Keep mismatched refs in `rejected_candidates`. [Planner model](https://developers.openai.com/api/docs/models/gpt-4.1-mini)
 
 P3 owns:
 - `python -m benchmark.run --job dict-a-l6 --cohort A --split holdout`: one measured run, receipt to stdout.
 - `python -m benchmark.publish --out receipts/producer.json`: Agent A's four runs and publishes. Accepts `--project-token-env`.
 - `python -m benchmark.agent --memory on --base-url http://127.0.0.1:8000 --out receipts/on.json`: Agent B searches, decides and posts the proposal. Prints the `decision_id`. Never executes. `--memory off` skips search.
-- `python -m benchmark.execute --decision ID`: runs only if the decision is approved, resolves the cited refs first, runs the registered configuration once, and posts the receipt.
+- `python -m benchmark.execute --decision ID`: requests trusted execution and prints the resulting decision and receipt; the platform atomically claims the approval, resolves the cited refs, runs the registered configuration once, and stores the receipt.
 
-B reads its token from `MEMORY_TOKEN`. Receipts include request, model, catalog and budget, candidates with applicability, selected and skipped jobs, exact used refs, approval, executed configuration, runtime, status, metric, byte counts, hashes and round-trip evidence. The planning arithmetic above came from a local Python 3.11 standard-library probe. Build acceptance requires receipts from the new runner.
+The tested rules mode is stateless and uses the same evidence-first policy, task, catalog and budget for every state. B reads its token from `MEMORY_TOKEN`. Receipts include request, model, catalog and budget, candidates with applicability, selected and skipped jobs, exact used refs, approval, executed configuration, runtime, status, metric, byte counts, hashes and round-trip evidence. The planning arithmetic above came from a local Python 3.11 standard-library probe. Build acceptance requires receipts from the new runner.
 
 ## Presenter service
 
@@ -157,10 +160,11 @@ P2 owns `uvicorn demo.presenter:app --host 127.0.0.1 --port 8100`. It serves the
 | `POST /demo/agent-b` | `{"memory":"on|off"}`. Runs `benchmark.agent` with B's token. Returns the pending decision. |
 | `POST /demo/rerun` | Repeats B's last request with the same memory setting. |
 | `POST /demo/decisions/{id}/approve` and `/reject` | Forwards with the maintainer token. |
-| `POST /demo/decisions/{id}/execute` | Runs `benchmark.execute`. |
+| `POST /demo/decisions/{id}/execute` | Uses the same trusted platform dispatcher as `benchmark.execute`. |
 | `POST /demo/governance/correct` | `{"result_id":…,"expected_version":…,"reason":…}`. Uses the prepared cohort B replacement from P3's receipt. |
 | `POST /demo/governance/expire` | `{"result_id":…,"expected_version":…,"reason":…}`. |
 | `GET /demo/results/{id}/history` | Forwards the history route. |
+| `GET /demo/results/{id}/evidence?version=1` | Forwards the scoped, current evidence route. |
 | `POST /demo/isolation-check` | Runs the same search and a direct read with the second project's token and returns both responses (expect no candidates and 404). |
 
 `python -m demo.reset --project demo-live` clears the demo project before a presentation.
