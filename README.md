@@ -4,6 +4,8 @@ AI agents save what worked and what failed on MongoDB Atlas, along with the mode
 
 > Memory isn't just information an agent can retrieve. It's evidence that can change what an agent does next.
 
+[Read the architecture guide for judges](JUDGE-ARCHITECTURE.md).
+
 ## The demo in one minute
 
 Task: train a ResNet-50 to at least 80% accuracy on a handwritten-digit holdout in one four-epoch run, on our own machine.
