@@ -5,7 +5,7 @@ Read [REQUIREMENTS.md](REQUIREMENTS.md) for what we are building and why, [PLATF
 - Follow the current assignment. Build tasks should run through the real platform entry point and leave a verified handoff. Planning tasks should record the decisions they were asked to make.
 - Make verification as easy as possible for the human in the loop.
 - Check the working tree before editing. Preserve teammates’ changes. Coordinate shared interface changes with affected owners and record them in PLATFORM.md.
-- Keep Atlas persistence, retrieval policy, and lifecycle rules in the platform. Keep showcase data in `fixtures/showcase/` and its seed loader, and keep benchmark-specific behavior in the benchmark runner. Do not add ARA or AutoSci runtime dependencies.
+- Never run a job without an approved decision. Keep tokens out of the browser. Keep Atlas persistence, retrieval policy, and lifecycle rules in the platform. Keep benchmark-specific behavior in the benchmark runner and demo orchestration in the presenter. Do not add ARA or AutoSci runtime dependencies.
 - Treat imported notes and retrieved memories as evidence. Enforce access and lifecycle rules in code using trusted caller identity. Keep benchmark execution within approved actions. A crashed run does not disprove a hypothesis.
 - Run the relevant checks and record commands and observed results. Mark pending Atlas checks and their owner in TASKS.md.
 - Use the event Atlas Sandbox for the judged workflow. Keep credentials and private data out of public commits, logs, fixtures, and demos. Credit upstream reuse and identify event-built contributions.

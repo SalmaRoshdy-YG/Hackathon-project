@@ -1,11 +1,12 @@
 # Hackathon-project
 
-We’re building a shared research memory where AI agents publish what worked and what didn’t, find related experiments by meaning, skip known failures, and pick experiments nobody has run yet. The platform controls who can use each result, which version is current, and when it expires. [Requirements in plain words](REQUIREMENTS.md#in-plain-words)
+We’re building a shared research memory on MongoDB Atlas where AI agents save what worked and what failed, and other agents use that evidence to choose their next experiment. Humans inspect the evidence, approve the agent’s choice, and correct or expire findings. [Requirements in plain words](REQUIREMENTS.md#in-plain-words)
 
-## Two demos
+> Memory isn’t just information an agent can retrieve. It’s evidence that can change what an agent does next.
 
-- **Research hub.** The ResNet study from ARA’s open-source examples, seeded through our API: negative results, ruled-out explanations, reproduction gaps and open experiments to claim. [Hub design](PLATFORM.md#research-hub-ui) · [Mockup](docs/mockup/index.html)
-- **Platform verification.** One fast CPU benchmark proves the memory changes the job a fresh agent actually runs, and that corrections, expiry and project isolation take effect. [Benchmark](PLATFORM.md#first-benchmark-and-agent-decision)
+## The demo
+
+One live research handoff on a tiny experiment that runs in seconds with no model training: making short messages as small as possible. Agent A publishes findings, a fresh Agent B finds them by meaning, skips what failed and ignores a finding from another cohort, a human approves, the job runs and is measured, and then a correction and an expiry visibly change B’s next recommendation. [Demo sequence](REQUIREMENTS.md#demo-sequence) · [Interface](PLATFORM.md#user-interface)
 
 ## Start here
 
