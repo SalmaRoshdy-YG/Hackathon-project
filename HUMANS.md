@@ -17,7 +17,7 @@ Start with one question. **Did a fresh agent use another agent’s measured resu
 
 ## What you can verify today
 
-The standalone API and presenter can be checked against Atlas independently of the selected experiment. The lookup data in tests is a verification fixture.
+At kickoff, this checkout contains planning documents. The team ran a local Python 3.11 compression probe. The probe measured 686 bytes with plain DEFLATE and 238 bytes with the matched dictionary on the same 928-byte holdout. The metric assumes sender and receiver already share the dictionary. Check the fixture recipe, thresholds, and the expected results for the other jobs. [Benchmark and planning measurements](PLATFORM.md#benchmark-and-agent-decision)
 
 The event Atlas round trip, applicability labels, approval, agent execution, lifecycle checks and the guided UI are build gates. Look for a handoff with a commit, an exact command, and an observed result before treating a gate as passed. A fixture or stub result can verify wiring. The live Atlas gate requires an event Sandbox run. [Verification gates](TASKS.md#verification-gates) · [Handoffs](TASKS.md#handoffs)
 
@@ -27,18 +27,18 @@ From the repository root, use a clean checkout and Python 3.11. Ask P1 for the l
 
 ```sh
 python -m pip install -r requirements.txt
+python -m benchmark.run --job dict-a-l6 --cohort A --split holdout
 python -m platform_api.preflight
-python -m demo.check_platform
-python -m demo.check_presenter
+python -m demo.rehearse --out receipts/rehearsal
 ```
 
-For API startup and configuring the selected experiment, see [Backend setup](BACKEND.md).
+The benchmark command only needs the local fixture. For the live checks, start the API using the service command and environment setup from the platform contract. Read the assertion summary and the producer and consumer receipts in `receipts/rehearsal/`. Compare executed configurations, measured byte counts, round-trip validity, and exact cited versions. [Service and API](PLATFORM.md#shared-entry-point) · [Receipt handoff](TASKS.md#handoff-between-producers-and-callers)
 
 | Claim | What to inspect |
 | --- | --- |
 | A publishes useful evidence | Find the positive, valid negative, other-cohort and crashed receipts. Completed ones show the fixture, cohort, job, measured ratio, threshold, successful decode and a rerun command. The crash is `crashed / invalid / undetermined` and never appears in search. |
 | B finds relevant research | After A exits, use a fresh B session. Its paraphrased question should find the two applicable cohort A findings and the cohort B finding through Atlas Vector Search, with the platform labelling the cohort B finding as a mismatch. |
-| Memory changes a real job | Compare the off, on, after-correction and after-correction-and-expiry receipts. Request, candidate jobs and one-job budget should match. Check that the approved memory-on job differs from the baseline because of the cited evidence. Each receipt records who approved it. The rejected decision has no receipt. |
+| Memory changes a real job | Compare the agent-on-its-own baseline (run outside Precedent), the Precedent run, and the after-correction and after-correction-and-expiry receipts. Request, candidate jobs and one-job budget should match. Expect plain level 1 in all but the first Precedent run, which uses the cohort A dictionary at level 6. Each receipt records who approved it. The rejected decision has no receipt. |
 | Access and lifecycle work | Both projects should find their own sentinels. A second project’s direct result and evidence reads should return 404 for the first project’s ref. A superseded or expired version should fail direct read, evidence read, and execution resolution, even if its stale search hit is still present, while history still shows it to project members. |
 | Humans stay in control | Start the presenter and walk the Demo page: reject once and confirm nothing ran, approve and see the measured result, correct and expire from the UI and rerun. In Research, the expired finding shows as Expired and the corrected one shows v1 and v2. Settings shows the isolation check. |
 
