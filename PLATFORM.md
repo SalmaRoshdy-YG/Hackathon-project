@@ -1,14 +1,16 @@
 # Platform contract
 
-This is the technical contract for [REQUIREMENTS.md](REQUIREMENTS.md) (R1–R11). One live research handoff on a fast CPU benchmark: Agent A publishes measured findings, a fresh Agent B finds them through event Atlas Vector Search, the platform labels which ones apply, B recommends a job, a human approves, the job runs, and human corrections and expiry change B's next recommendation. The same contract can support more agents and studies later through project membership, versioned results, and new job catalogs.
+This is the technical contract for [REQUIREMENTS.md](REQUIREMENTS.md) (R1–R11, plus Phase 2 governance G1–G3). One live research handoff on a real GPU task: seeded agents publish measured experiments and weights, Claude Code finds them through event Atlas Vector Search, the platform labels which ones fit, Claude Code proposes a plan, a person confirms, the job trains locally and the result is saved back. The same contract supports more agents and studies later through project membership, versioned results and new job catalogs.
 
 We build our own platform. No ARA or AutoSci code, runtime or adapter is on the build path. See [Credits](#credits).
 
+**What exists today.** `platform_api/` (Atlas storage, search, versions, decisions, command listener) and `demo/presenter.py` are built and described in [BACKEND.md](BACKEND.md). The ResNet experiment profile, the MCP server, the weights routes and the web UI are still to build, per [TASKS.md](TASKS.md). Everything marked "target" below is not built yet.
+
 ## Shared entry point
 
-Use Python 3.11, FastAPI and PyMongo. P1 owns `uvicorn platform_api.app:app --host 127.0.0.1 --port 8000` and the HTTP JSON contract below. P2 owns the presenter service that serves the UI and drives the demo (see [Presenter service](#presenter-service)). Callers can work against a stub serving these payloads until the real service is up. P4 owns the top-level rehearsal. All commands in this plan are implementation targets.
+Use Python 3.11, FastAPI and PyMongo. The platform owner runs `uvicorn platform_api.app:app --host 127.0.0.1 --port 8000` and the HTTP JSON contract below. The presenter service serves the UI and owns the embedded terminal (see [Presenter service](#presenter-service)). Callers can work against a stub serving these payloads until the real service is up.
 
-The service maps opaque bearer tokens in server-side `MEMORY_TOKENS_JSON` to a trusted `project_id`, `agent_id`, and `role`. Example mapping entry: `{"<publisher-token>":{"project_id":"team-run-01","agent_id":"agent-a","role":"publisher"}}`. Issue a publisher token for Agent A, a reader token for Agent B, a maintainer token for the human (corrections, expiry, approval), and a reader in a second project for the isolation check. Rehearsals use fresh project IDs in the same Atlas database and index. Each process receives only its own token. Atlas and provider credentials stay with the service and the trusted runner. Tokens never reach the browser. The service sets project and author from the token and rejects caller-supplied identity fields.
+The service maps opaque bearer tokens in server-side `MEMORY_TOKENS_JSON` to a trusted `project_id`, `agent_id`, and `role`. Example mapping entry: `{"<publisher-token>":{"project_id":"team-run-01","agent_id":"agent-a","role":"publisher"}}`. Issue a publisher token for the seeding agents, a reader token for Claude Code, a maintainer token for the person (approval, and in Phase 2 corrections and expiry), and a reader in a second project for the isolation check. Rehearsals use fresh project IDs in the same Atlas database and index. Each process receives only its own token. Atlas and provider credentials stay with the service and the trusted runner. Tokens never reach the browser. The service sets project and author from the token and rejects caller-supplied identity fields.
 
 | Role | Can |
 | --- | --- |
@@ -18,31 +20,31 @@ The service maps opaque bearer tokens in server-side `MEMORY_TOKENS_JSON` to a t
 
 ## Results
 
-Every result has `schema_version: 1`, `hypothesis`, `fixture_revision`, flat `conditions` and `configuration` objects with scalar values, `metric` with name, value, unit, operator and threshold, `execution` (`completed|crashed|timed_out`), `validity` (`valid|invalid|inconclusive`), `direction` (`positive|negative|undetermined`), `evidence`, `source`, and UTC `expires_at`. A completed, valid measurement with a receipt supports a positive or negative direction according to the threshold. Other combinations require `undetermined` and may have a null metric value. Such records are stored and shown to humans with a "crashed" or "inconclusive" label, but search, applicability and resolve only use completed, valid results. A crash never counts as a failed idea.
+Every result has `schema_version: 1`, `hypothesis`, `fixture_revision`, flat `conditions` and `configuration` objects with scalar values, `metric` with name, value, unit, operator and threshold, `execution` (`completed|crashed|timed_out`), `validity` (`valid|invalid|inconclusive`), `direction` (`positive|negative|undetermined`), `evidence`, `source`, and UTC `expires_at`. A completed, valid measurement with a receipt supports a positive or negative direction according to the threshold. A run that diverges (loss becomes NaN, accuracy stays at chance) completed and measured something, so it is a valid negative. A run that never produces a measurement (out of GPU memory) is a crash. Other combinations require `undetermined` and may have a null metric value. Such records are stored and shown to humans with a "crashed" or "inconclusive" label, but search, applicability and resolve only use completed, valid results. A crash never counts as a failed idea.
 
 Example body for `POST /v1/results`. Evidence is a small inline JSON receipt. The API serves it under the result's visibility and lifecycle.
 
 ```json
 {
   "schema_version": 1,
-  "hypothesis": "A shared phrase dictionary for cohort A will keep independent DEFLATE payloads at or below 40% of input bytes.",
-  "fixture_revision": "short-events-v1",
-  "conditions": {"cohort": "A", "split": "calibration", "codec": "zlib-wrapped-deflate", "dictionary_revision": "phrases-v1"},
-  "configuration": {"job_id": "dict-a-l1", "level": 1, "dictionary_family": "A"},
-  "metric": {"name": "wire_ratio", "value": 0.2607758621, "unit": "ratio", "operator": "<=", "threshold": 0.4},
+  "hypothesis": "Fine-tuning ResNet-18 from ImageNet weights reaches at least 90% test accuracy on CIFAR-10 in three epochs.",
+  "fixture_revision": "cifar10-v1",
+  "conditions": {"dataset": "cifar10", "model": "resnet18", "input_size": 32},
+  "configuration": {"job_id": "finetune-lr0.01", "init": "imagenet-weights", "optimizer": "sgd", "lr": 0.01, "epochs": 3, "batch_size": 128, "seed": 0},
+  "metric": {"name": "test_accuracy", "value": 0.934, "unit": "ratio", "operator": ">=", "threshold": 0.90},
   "execution": "completed",
   "validity": "valid",
   "direction": "positive",
-  "evidence": {"kind": "job_receipt", "data": {"run_id": "cal-a-1", "input_bytes": 928, "output_bytes": 242, "roundtrip_ok": true,
-    "reproduce": {"command": "python -m benchmark.run --job dict-a-l1 --cohort A --split calibration", "fixture_sha256": "<hex>", "dictionary_sha256": "<hex>", "zlib_version": "1.3.1", "python_version": "3.11.9"}}},
-  "source": {"system": "benchmark", "source_agent": "agent-a", "record": "dict-a-l1"},
-  "expires_at": "2026-11-15T00:00:00Z"
+  "evidence": {"kind": "job_receipt", "data": {"run_id": "seed-ft-1", "train_seconds": 68.4, "gpu": "<name from torch.cuda>", "weights_sha256": "<hex>",
+    "reproduce": {"command": "python -m benchmark.run --job finetune-lr0.01", "seed": 0, "torch_version": "<x.y.z>", "torchvision_version": "<x.y.z>", "python_version": "3.11.9"}}},
+  "source": {"system": "benchmark", "source_agent": "vision-agent-1", "record": "finetune-lr0.01"},
+  "expires_at": "2026-12-15T00:00:00Z"
 }
 ```
 
 Use a fresh future timestamp in the harness. `evidence.data.reproduce` is required for completed runs (R11). `Ref` is `{"result_id":"<uuid>","version":1}`. `Result` is the publish body without `evidence`, plus `Ref` fields, `author_id` and `status` (`current|expired`). Output errors use `{"detail":"<stable code>"}`.
 
-`Applicability` is computed by the platform against the caller's task conditions: `{"status":"applies|mismatch","mismatches":[{"field":"cohort","wanted":"A","found":"B"}]}`. The rule is exact agreement on `fixture_revision`, `conditions.cohort`, `conditions.codec` and `conditions.dictionary_revision`. A calibration result applies to a holdout task (declared transfer); split is otherwise ignored. A result with execution or validity other than completed and valid is never returned by search.
+`Applicability` is computed by the platform against the caller's task conditions: `{"status":"applies|mismatch","mismatches":[{"field":"dataset","wanted":"cifar10","found":"fashion-mnist"}]}`. The rule is exact agreement on `fixture_revision`, `conditions.dataset`, `conditions.model` and `conditions.input_size`. Weights and settings are not match fields, because they are what an agent chooses. They are evidence, not conditions. A result with execution or validity other than completed and valid is never returned by search.
 
 ## Routes
 
@@ -50,15 +52,15 @@ Use a fresh future timestamp in the harness. `evidence.data.reproduce` is requir
 | --- | --- |
 | `GET /v1/health` | → 200 `{"atlas":"ok","index":"READY","database":"<name>","project_id":"<from token>"}`. 503 with the failing part if Atlas or the index is unavailable. |
 | `POST /v1/results` | Publish body → 201 `Ref`. Version starts at 1. |
-| `GET /v1/results` | → 200 `{"items":[Result]}`: every head in the caller's project, including expired ones with `status:"expired"` and crashed ones. For the Research and Governance pages. Agents do not use it for decisions. |
-| `POST /v1/search` | `{"question":"What previously helped shrink one-at-a-time cohort A telemetry packets?","conditions":{"fixture_revision":"short-events-v1","cohort":"A","codec":"zlib-wrapped-deflate","dictionary_revision":"phrases-v1","split":"holdout"}}` → 200 `{"candidates":[{"result":Result,"score":0.82,"applicability":Applicability}]}`. Only current, usable results. Mismatched results are returned with their label so the agent and the UI can show why they were set aside. `conditions` is optional; without it `applicability` is null. May return an empty list. |
+| `GET /v1/results` | → 200 `{"items":[Result]}`: every head in the caller's project, including expired ones with `status:"expired"` and crashed ones. For tooling and Phase 2 governance. Agents do not use it for decisions. |
+| `POST /v1/search` | `{"question":"What has worked for training a small ResNet on CIFAR-10 to high accuracy quickly?","conditions":{"fixture_revision":"cifar10-v1","dataset":"cifar10","model":"resnet18","input_size":32}}` → 200 `{"candidates":[{"result":Result,"score":0.82,"applicability":Applicability}]}`. Only current, usable results. Mismatched results are returned with their label so Claude Code and the screen can show why they were set aside. `conditions` is optional; without it `applicability` is null. May return an empty list. |
 | `GET /v1/results/{id}?version=1` | → 200 `Result`. An omitted version means current. 404 if expired or superseded. |
 | `GET /v1/results/{id}/evidence?version=1` | → 200 `{"result_id":"<uuid>","version":1,"evidence":{…}}`. Same version rules. |
-| `GET /v1/results/{id}/history` | → 200 `{"result_id":"<uuid>","status":"current|expired","current_version":2,"versions":[{"version":1,"state":"superseded","result":Result,"evidence":{…},"replaced_at":"…","replaced_by":"maintainer","reason":"…"},{"version":2,"state":"current",…}],"events":[{"at":"…","actor":"…","action":"publish|correct|expire","version":2,"reason":"…"}]}`. For humans (R7, R8). Any project role. Old versions here are for inspection only: search, read, evidence and resolve never accept them. |
-| `POST /v1/results/{id}/correct` | `{"expected_version":1,"reason":"Receipt was linked to the wrong cohort","replacement":{…full publish body…}}` → 200 `Ref` with version 2. |
+| `GET /v1/results/{id}/history` | → 200 `{"result_id":"<uuid>","status":"current|expired","current_version":2,"versions":[{"version":1,"state":"superseded","result":Result,"evidence":{…},"replaced_at":"…","replaced_by":"maintainer","reason":"…"},{"version":2,"state":"current",…}],"events":[{"at":"…","actor":"…","action":"publish|correct|expire","version":2,"reason":"…"}]}`. For humans (Phase 2, G1 and G2). Any project role. Old versions here are for inspection only: search, read, evidence and resolve never accept them. |
+| `POST /v1/results/{id}/correct` | `{"expected_version":1,"reason":"Weights file was linked to the wrong dataset","replacement":{…full publish body…}}` → 200 `Ref` with version 2. |
 | `POST /v1/results/{id}/expire` | `{"expected_version":1,"reason":"Superseded by newer measurements"}` → 200 `{"result_id":"<uuid>","version":1,"expired":true}`. A scheduled expiry uses the publish timestamp. |
 | `POST /v1/resolve` | `{"refs":[Ref]}` → 200 `{"results":[Result]}` in request order if every ref is current and usable. Validate immediately before dispatch. |
-| `POST /v1/decisions` | Agent B's proposal: `{"request":"…","conditions":{…},"candidates":[{"ref":Ref,"score":0.86,"applicability":Applicability}],"job_id":"dict-a-l6","used_refs":[Ref],"skipped_jobs":[{"job_id":"dict-b-l6","reason":"…","refs":[Ref]}],"rejected_candidates":[{"ref":Ref,"reason":"…"}],"reason":"…","model":"gpt-4.1-mini-2025-04-14"}` → 201 `Decision` with `status:"pending"`. 422 if the job is not in the catalog, or a used ref is not current or does not apply. |
+| `POST /v1/decisions` | Claude Code's plan: `{"request":"…","conditions":{…},"candidates":[{"ref":Ref,"score":0.86,"applicability":Applicability}],"job_id":"finetune-lr0.01","used_refs":[Ref],"skipped_jobs":[{"job_id":"scratch-lr0.4","reason":"…","refs":[Ref]}],"rejected_candidates":[{"ref":Ref,"reason":"…"}],"reason":"…","model":"claude-code"}` → 201 `Decision` with `status:"pending"`. 422 if the job is not in the catalog, or a used ref is not current or does not apply. |
 | `GET /v1/decisions/{id}` | → 200 `Decision`. |
 | `POST /v1/decisions/{id}/approve` | `{"note":"Looks right"}` → 200 `Decision` with `status:"approved"`, `decided_by`, `decided_at`. Maintainer only. 409 unless pending. |
 | `POST /v1/decisions/{id}/reject` | `{"reason":"Try the baseline first"}` → 200 `Decision` with `status:"rejected"`. Maintainer only. 409 unless pending. Nothing runs. |
@@ -91,9 +93,9 @@ db.result_vectors.aggregate([
   { $unwind: "$head" },                        // drops stale, expired and crashed hits
   { $addFields: { mismatches: { $filter: { as: "m", cond: { $ne: ["$$m.found", "$$m.wanted"] }, input: [
       { field: "fixture_revision", wanted: C.fixture_revision, found: "$head.fixture_revision" },
-      { field: "cohort", wanted: C.cohort, found: "$head.conditions.cohort" },
-      { field: "codec", wanted: C.codec, found: "$head.conditions.codec" },
-      { field: "dictionary_revision", wanted: C.dictionary_revision, found: "$head.conditions.dictionary_revision" } ] } } } },
+      { field: "dataset", wanted: C.dataset, found: "$head.conditions.dataset" },
+      { field: "model", wanted: C.model, found: "$head.conditions.model" },
+      { field: "input_size", wanted: C.input_size, found: "$head.conditions.input_size" } ] } } } },
   { $addFields: { applicability: { status: { $cond: [{ $eq: [{ $size: "$mismatches" }, 0] }, "applies", "mismatch"] }, mismatches: "$mismatches" } } },
   { $limit: 8 }
 ])
@@ -105,52 +107,54 @@ db.result_vectors.aggregate([
 - `decisions` holds one document per decision. Approve, reject and receipt are conditional updates on `status`, so a decision can't be approved twice or executed without approval.
 - Expiry hides the record from every agent path immediately. TTL on each collection's BSON Date `purge_at` with `expireAfterSeconds: 0` is asynchronous cleanup: heads and vectors get `expires_at + 24h`, history entries get the head's purge date. Best-effort deletion of a retired vector after correction or expiry can shorten retention. The API stays correct if deletion or TTL lags. [Atlas TTL](https://www.mongodb.com/docs/manual/core/index-ttl/)
 
-## Benchmark and agent decision
+## Benchmark
 
-Use `short-events-v1`, a synthetic independent-event compression fixture. Each message is compressed on its own, as if sent one at a time. A pre-shared dictionary models a receiver that already knows the deployment's event vocabulary. Count all zlib stream bytes, including headers and the dictionary ID. Dictionary distribution is a fixed setup cost outside the per-message metric and should be disclosed in the demo. No model is trained anywhere.
+**Task.** Fine-tune a ResNet-18 on CIFAR-10 to at least 90% test accuracy in one run of at most three epochs and about two GPU-minutes, on the team's GPU PC. `fixture_revision` is `cifar10-v1`: torchvision's CIFAR-10 train and test splits, a fixed validation hold-out from train, fixed seeds, 32 px inputs, and the final test accuracy as the metric (`>= 0.90` is success). Task conditions are `dataset=cifar10`, `model=resnet18`, `input_size=32`. Training is on a local NVIDIA GPU with PyTorch. Nothing else in the project trains.
 
-Generate 32 ASCII tokens per cohort A and B using the first 24 hex characters of SHA-256 of `"{cohort}:{i}"` for indices 0–31. Join each cohort's 32 tokens with `|` for its pre-shared `phrases-v1` dictionary. Make eight rows per split, each the first 16 hex characters of SHA-256 of `"{cohort}:{split}:{j}"` followed by four tokens, all joined by `|`. Use token indices `(4*j + offset + k) % 32`, where `j=0..7`, `k=0..3`, and offset is 0 for `calibration` and 1 for `holdout`. Each split has 928 input bytes. Compress each row in its own `zlib.compressobj(level, zlib.DEFLATED, 15, **kwargs)` stream, with `zdict` only for dictionary jobs. Decompress with identical dictionary and window settings and verify exact equality and end-of-stream for all rows. Score `wire_ratio = sum(output_bytes) / sum(input_bytes)` with `<= 0.40` as success. Record the rerun command, fixture and dictionary hashes, and zlib and Python versions in the receipt.
+**Job catalog (registered, ordered).** The approved action is always one of these, run once with a fixed seed and the stored receipt:
 
-| Agent A run | Input | Configuration | Planning probe |
+| Job | What it runs |
+| --- | --- |
+| `scratch-lr0.1` | Random init, SGD lr 0.1, 3 epochs. The baseline: what Claude Code does on its own. |
+| `finetune-lr0.01` | Start from stored ImageNet weights, SGD lr 0.01, 3 epochs. |
+| `scratch-lr0.4` | Random init, SGD lr 0.4, 3 epochs. Known to diverge. |
+
+**Seeded experiments.** The benchmark owner runs these on the GPU PC, publishes them with the seeding agents' token, and stores the weights in GridFS. All numbers in the mockup are illustrative until these are measured.
+
+| Experiment | Conditions | Expected outcome | Role in the demo |
 | --- | --- | --- | --- |
-| Promising finding | A calibration | `dict-a-l1`, level 1, dictionary A | 242/928, positive |
-| Failed approach | A calibration | `dict-b-l1`, level 1, dictionary B | 760/928, completed valid negative with all rows decoded |
-| Other cohort | B calibration | `dict-b-l1`, level 1, dictionary B | 234/928, positive under cohort B |
-| Crashed run | A calibration | `dict-c-l1`, dictionary C, which is not provisioned | Runner fails before measuring: `crashed / invalid / undetermined`, null metric |
+| `finetune-lr0.01` | CIFAR-10, ResNet-18, 32 px | Positive, about 93% | The finding Claude Code builds on. Weights stored. |
+| `scratch-lr0.4` | CIFAR-10, ResNet-18, 32 px | Valid negative, diverges to chance | The dead end Claude Code avoids. |
+| `scratch-lr0.05` on Fashion-MNIST | Fashion-MNIST, ResNet-18, 28 px | Positive, about 95% | Looks great, does not fit: `dataset` and `input_size` differ. |
+| Batch 4096 | CIFAR-10, ResNet-18, 32 px | Out of GPU memory in the first step: `crashed / invalid / undetermined`, null metric | Stored and visible, never returned by search. |
+| ResNet paper, Table 2 (optional import) | ImageNet, 224 px | Background | Shows how published work loads in. Marked as imported. |
 
-Agent A runs these four jobs, turns each runner receipt into a publish body with `python -m benchmark.publish`, publishes with its own token, then exits. The crashed run shows humans that a crash is labelled differently from a failed idea; search never returns it.
+**Calibration gate.** Before the mockup numbers are trusted, run every catalog job and every seeded experiment on the GPU PC, record accuracy, GPU seconds, and the library versions, and check: the baseline lands well below 90%, `finetune-lr0.01` lands above 90% inside two minutes, `scratch-lr0.4` really diverges, and the batch-4096 run really runs out of memory. If a result lands on the wrong side of 90%, change epochs or learning rates and rerun. The decision should not depend on luck: use fixed seeds and re-run three times.
 
-Agent B uses the same request, conditions, one-job budget, prompt and ordered catalog every time. Request: “Can we get individually transmitted cohort A telemetry well under half its original size on unseen events? Aim for 40% or less and spend one trial.” Search question: “What previously helped shrink one-at-a-time cohort A telemetry packets?” A's published text uses “independent DEFLATE event payloads” and “shared phrase dictionaries”, so finding it needs search by meaning. Smoke-check the paraphrase in a set with five unrelated valid findings and the cohort B finding. The required findings must be among the candidates, and at least one applicable finding must rank above all unrelated ones.
+**The decision.** Claude Code gets the same request every time: "Build on what past agents learned about training ResNet-18 on CIFAR-10. Target 90%, one run, 2 GPU-minutes." Claude Code searches, reads each candidate's evidence, and proposes a job through `propose_plan`. Only results labelled `applies` may be cited as support or as a reason to skip a job. The platform rejects a plan that cites a mismatched, crashed or non-current result (HTTP 422), or a job outside the catalog.
 
-Demo and rehearsal states run in this order in one project, with the same request each time:
-
-| State | What changed | Expected recommendation on A holdout | Planning probe |
+| Run | Same request and budget | Expected job | Expected result |
 | --- | --- | --- | --- |
-| Agent on its own | Same agent outside Precedent: no token, no search, no approval step | `plain-l1`, no dictionary | 686/928 |
-| With Precedent | — | `dict-a-l6`. Cites the promising finding v1 and the failed approach v1. Skips `dict-b-l6` because dictionary B failed on cohort A. Rejects the cohort B finding as a mismatch. | 238/928 |
-| After correction | Maintainer corrects the promising finding: the receipt belonged to cohort B. v2 is the measured `dict-a-l1` on B calibration (probe 760/928, valid negative). | `plain-l1`. v2 now shows as a cohort mismatch. Dictionary B still skipped because of the failed approach. | 686/928 |
-| After correction and expiry | Maintainer expires the failed approach (“Superseded by newer measurements”). | `plain-l1`. The failed approach is no longer among the candidates and shows as Expired in the UI. `dict-b-l6` is now skipped for lack of applicable evidence instead of a known failure. | 686/928 |
+| Claude Code on its own | No Precedent tools, no `.mcp.json` | `scratch-lr0.1` | About 71% |
+| Claude Code with Precedent | Reads the memory | `finetune-lr0.01`, citing the positive and the failed `scratch-lr0.4`, setting aside Fashion-MNIST | About 93% |
 
-The job changes once (on → after correction). The expiry changes the evidence and the skip reasons visibly, but not the job, because nothing applicable supports a dictionary by then. Say so in the demo. Scheduled expiry (an `expires_at` that passes on its own) is tested separately in the lifecycle gate, not in the live demo.
+An LLM is not deterministic. Record the baseline and the Precedent run several times during rehearsal. If Claude Code is unstable, keep the same evidence rules and run a scripted planner that applies them (labelled as such). Phase 2 adds a correction and an expiry run on the same request.
 
-The third candidate, `dict-b-l6`, measured 760/928 on A holdout in the probe. Measure it during fixture validation so every candidate is accounted for. Each finding should land on the expected side of the threshold. Byte counts can vary by zlib version, which the runner records.
+**What to build** (owner in [TASKS.md](TASKS.md)):
 
-The catalog order is `plain-l1`, `dict-a-l6`, `dict-b-l6`. The no-evidence baseline is the dictionary-free job because it assumes no shared receiver vocabulary. B fetches each candidate's versioned evidence before deciding and attaches the measurement and the platform's applicability label to the model context. Use one stateless `gpt-4.1-mini-2025-04-14` Responses request per decision with a JSON schema for `job_id`, `used_refs`, `skipped_jobs` with reasons and refs, `rejected_candidates` with refs and reasons, and `reason`. Instructions favor a bounded follow-up with applicable support, then the baseline. Level 1 supports testing the same dictionary family at level 6. A valid negative discourages repeating that dictionary family under the same conditions and is advisory across compression levels. Only results labelled `applies` may appear in `used_refs` or as reasons for skips; the platform rejects the decision otherwise. Keep mismatched refs in `rejected_candidates`. [Planner model](https://developers.openai.com/api/docs/models/gpt-4.1-mini)
+- `python -m benchmark.run --job <id> [--init <weights>]`: one measured run on the GPU, receipt to stdout, weights saved to a file.
+- `python -m benchmark.publish`: runs or loads the seeded experiments, publishes them with the seeding token, uploads weights, then exits.
+- `python -m benchmark.execute --decision ID`: runs only if the decision is approved, resolves the cited versions first, runs the registered job once, uploads the new weights and posts the receipt.
+- A `benchmark.profile` module exporting the `EXPERIMENT` object that the platform loads through `MEMORY_EXPERIMENT_MODULE` (catalog, baseline, match fields `fixture_revision`, `dataset`, `model`, `input_size`, support predicate, runner). See [BACKEND.md](BACKEND.md#switch-experiments).
+- The baseline recording: run Claude Code in an empty folder with no `.mcp.json` and the same prompt, save its receipt to `receipts/baseline.json`.
 
-P3 owns:
-- `python -m benchmark.run --job dict-a-l6 --cohort A --split holdout`: one measured run, receipt to stdout.
-- `python -m benchmark.publish --out receipts/producer.json`: Agent A's four runs and publishes. Accepts `--project-token-env`.
-- `python -m benchmark.agent --base-url http://127.0.0.1:8000 --out receipts/on.json`: Agent B searches, decides and posts the proposal. Prints the `decision_id`. Never executes.
-- `python -m benchmark.agent --standalone --out receipts/baseline.json`: the baseline. The same agent and prompt with no Precedent token and no base URL; it never calls the platform, plans with an empty evidence list, runs its job locally and writes the receipt to a file. The presenter shows this file as “Agent on its own”.
-- `python -m benchmark.execute --decision ID`: runs only if the decision is approved, resolves the cited refs first, runs the registered configuration once, and posts the receipt.
-
-B reads its token from `MEMORY_TOKEN`. Receipts include request, model, catalog and budget, candidates with applicability, selected and skipped jobs, exact used refs, approval, executed configuration, runtime, status, metric, byte counts, hashes and round-trip evidence. The planning arithmetic above came from a local Python 3.11 standard-library probe. Build acceptance requires receipts from the new runner.
+Receipts include the request, catalog and budget, candidates with fit labels, the selected and skipped jobs, exact cited versions, approval, executed configuration, GPU seconds, accuracy, weights hash and reproduce block.
 
 ## Claude Code integration
 
 Claude Code is the agent in the loop. It never talks to Atlas directly; it uses the platform through an MCP server, so every rule in this contract applies to it.
 
-P3 owns `python -m platform_api.mcp` (stdio MCP server), registered for Claude Code in the demo working directory’s `.mcp.json`. It holds the reader token for the person’s project and the session identity for approvals. Tools:
+The benchmark and agent owner builds `python -m platform_api.mcp` (stdio MCP server), registered for Claude Code in the demo working directory’s `.mcp.json`. It holds the reader token for the person’s project and the session identity for approvals. Tools:
 
 | Tool | Calls | Notes |
 | --- | --- | --- |
@@ -158,29 +162,31 @@ P3 owns `python -m platform_api.mcp` (stdio MCP server), registered for Claude C
 | `get_experiment(result_id, version?)` | `GET /v1/results/{id}` and `/evidence` | Current versions only. |
 | `propose_plan(job, used_refs, avoided_refs, set_aside_refs, reason)` | `POST /v1/decisions` | Stores the plan as `pending`. The decision document’s cited, avoided and set-aside refs are what the UI highlights, pushed by the `decisions` change stream. |
 | `run_plan(decision_id)` | `POST /v1/decisions/{id}/approve`, then the runner | Not in Claude Code’s allowed tools, so Claude Code’s permission prompt asks the person first. That confirmation is the approval; the MCP server records it with the person’s identity. “Not now” calls `/reject`. |
-| `load_weights(result_id)` | `GET /v1/results/{id}/weights` | Streams the GridFS file after the same lifecycle check as resolve. Packaged weights (for example `torchvision` `ResNet50_Weights.IMAGENET1K_V1`) are recorded as the source on the result. |
+| `load_weights(result_id)` | `GET /v1/results/{id}/weights` | Streams the GridFS file after the same lifecycle check as resolve. Packaged weights (for example `torchvision` `ResNet18_Weights.IMAGENET1K_V1`) are recorded as the source on the result. |
 | `publish_result(body, decision_id)` | `POST /v1/results` | Publishes the run as a new experiment, linked to the decision and the versions it used. |
 
 New route for weights: `GET /v1/results/{id}/weights?version=` → 200 streamed file with `X-Weights-SHA256`, from GridFS bucket `weights` (`fs.files` metadata carries `project_id`, `result_id`, `version`, `source`). Same 404 rules as evidence. Publishing may attach weights by upload to `POST /v1/results/{id}/weights` (publisher or maintainer).
 
 **Embedded terminal.** The presenter serves an xterm.js panel connected over a localhost WebSocket (`/demo/terminal`) to a PTY on the presenter’s machine, started in the demo working directory, where the person runs `claude`. It is the person’s own terminal shown inside the page: nothing in the browser holds tokens, and the PTY is only reachable from localhost. If the PTY fails during judging, run Claude Code in a normal terminal beside the browser; the highlights and results still appear through change streams.
 
-The baseline is the same `claude` session started outside the demo directory, with no `.mcp.json`, so it has no Precedent tools.
+The baseline is the same `claude` session started outside the demo directory, with no `.mcp.json`, so it has no Precedent tools. It is recorded before the demo. The platform's `memory: "off"` proposal exists for the backend's own contract tests and is not part of the demo comparison.
 
 ## Presenter service
 
-P2 owns `uvicorn demo.presenter:app --host 127.0.0.1 --port 8100`. It serves the UI at `/`, holds the four tokens server-side, and calls the platform API and P3's commands. The browser only talks to the presenter. It binds to localhost.
+`uvicorn demo.presenter:app --host 127.0.0.1 --port 8100` serves the UI at `/`, holds the four tokens server-side, and calls the platform API and the benchmark commands. The browser only talks to the presenter. It binds to localhost.
+
+**Two ways to drive the demo.** The main path is Claude Code in the embedded terminal through MCP. The routes below also support a scripted path (producer and planner modules) that the presenter already implements. It is the fallback if Claude Code or the PTY misbehaves during judging, and the way rehearsals run unattended. The governance routes (`/demo/governance/*`) are Phase 2.
 
 | Route | Does |
 | --- | --- |
 | `GET /demo/state` | Current stage, health from `GET /v1/health`, project, the baseline receipt from `receipts/baseline.json`, findings from `GET /v1/results`, latest decision and receipts. |
 | `GET /demo/events` | Server-sent events: `change` events from the change streams (operation, collection, result or decision ID, version, status) and `atlas` events from the command listener (command, collection, ms, docs, redacted shape). The UI subscribes once on load. |
-| `POST /demo/agent-a` | Runs `benchmark.publish` with A's token. |
+| `POST /demo/agent-a` | Runs `benchmark.publish` with the seeding token. |
 | `POST /demo/agent-b` | `{}`. Runs `benchmark.agent` with B's token. Returns the pending decision. |
 | `POST /demo/rerun` | Repeats B's last request. |
 | `POST /demo/decisions/{id}/approve` and `/reject` | Forwards with the maintainer token. |
 | `POST /demo/decisions/{id}/execute` | Runs `benchmark.execute`. |
-| `POST /demo/governance/correct` | `{"result_id":…,"expected_version":…,"reason":…}`. Uses the prepared cohort B replacement from P3's receipt. |
+| `POST /demo/governance/correct` | `{"result_id":…,"expected_version":…,"reason":…}`. Phase 2. Uses a prepared replacement body. |
 | `POST /demo/governance/expire` | `{"result_id":…,"expected_version":…,"reason":…}`. |
 | `GET /demo/results/{id}/history` | Forwards the history route. |
 | `GET /demo/terminal` | WebSocket to the embedded terminal’s PTY. Localhost only. |
@@ -190,32 +196,32 @@ P2 owns `uvicorn demo.presenter:app --host 127.0.0.1 --port 8100`. It serves the
 
 ## User interface
 
-P4 owns `demo/web/`, a static HTML, CSS and JavaScript bundle served by the presenter. Requirements are in [REQUIREMENTS.md](REQUIREMENTS.md#interface). Visual direction: dark green sidebar, light workspace, restrained green accents, our own product name and mark. Show Atlas status from `/v1/health` without exposing internals.
+The mockup is [docs/demo/index.html](docs/demo/index.html). The web app is one static HTML, CSS and JavaScript bundle in `demo/web/`, served by the presenter. Requirements are in [REQUIREMENTS.md](REQUIREMENTS.md#interface). It is **not** a dashboard: one screen, centred on Claude Code and the decision.
 
-| Page | Contents |
+| Area | Contents |
 | --- | --- |
-| Demo (default) | Six stages from the demo sequence, with a Next button the presenter controls. Stages 2–5 show the experiment list beside the embedded terminal. When Claude Code proposes a plan, its cited, avoided and set-aside experiments are highlighted (used, avoiding, doesn’t fit, with the mismatched field named). Stage 3 is the person’s confirmation in the terminal (Run it or Not now). Stage 4 shows the result beside “Claude Code on its own” and the new experiment in the list. Stage 5 has Correct and Expire and asks Claude Code again after each. Stage 6 shows the four runs side by side. |
-| Research | Searchable list from `GET /v1/results` with status (current, expired, superseded count), outcome label, execution label, cohort and conditions, and source agent. A detail view shows evidence, the rerun command, provenance and version history. |
-| Governance | Findings to review, Correct and Expire forms with a required reason, the previous and current versions side by side, and the change history. |
-| Settings | Atlas health, project, agents in the project, how the baseline was recorded, environment info (model, embedding model, zlib version), and the isolation check button with its result. |
+| Top bar | Product name and mark, the four stages (Past experiments, Ask Claude Code, You decide, Result), Atlas status from `/v1/health` without exposing internals. |
+| Centre | The embedded terminal (xterm.js over a localhost WebSocket to a PTY in the demo working directory). Beside it, the experiments list. When Claude Code calls `propose_plan`, the cited, avoided and set-aside experiments are highlighted (using, avoiding, doesn't fit with the mismatched field named). Crashed experiments are shown as "never offered". |
+| After the run | One result card: Claude Code on its own against Claude Code with Precedent, with the 90% target marked. |
+| Drawer | Opens only when someone clicks an experiment or an Atlas line. Conditions first, then outcome, rerun command, weights and record. |
+| Atlas strip | Along the bottom: the latest real commands from `/demo/events`, for example `aggregate result_vectors · $vectorSearch + $lookup · 4 docs · 38 ms`. Clicking opens the redacted pipeline in the drawer. |
 
-**MongoDB on screen.** Two elements make the database's work visible during the whole demo. Both use only live data from `/demo/events`; nothing is hardcoded.
+Both MongoDB elements use only live data from `/demo/events`. Nothing is hardcoded in the real UI. In the mockup they are simulated.
 
-- **Atlas activity strip** along the bottom of every page: the latest commands as they run, for example `aggregate result_vectors · $vectorSearch + $lookup · 4 docs · 38 ms`, `update results · transaction · v1 → v2`, `change stream · results · update`. Clicking a line opens the redacted pipeline in the inspector.
-- **“In MongoDB” callout** at each Demo stage, one sentence built from that stage's real events:
+**"In MongoDB" sentence per stage:**
 
-| Stage | What the callout shows |
+| Stage | What it shows |
 | --- | --- |
-| 1 Agent A discovers | Four `insert` commands and their change-stream events arriving; findings appear in the list live. |
-| 2 Agent B recommends | The `$vectorSearch` aggregate with the `project_id` filter, hits and latency, and the same pipeline's `$lookup` and applicability stages: which hits matched the live record, and the cohort mismatch computed in the database. |
-| 3 Human approves | The conditional `findOneAndUpdate` from `pending` to `approved`, and the 409 on a second click. |
-| 4 Agent B executes | `resolve` re-reading the cited versions, then the receipt `update` and its change event. |
-| 5 Governance | The correction transaction (head replaced, old version copied to `result_versions`), the expiry `update` of `expires_at`, and the stale index entry still present but dropped by the `$lookup`. TTL `purge_at` shown as future cleanup that nothing waits on. |
-| 6 Updated decision | Side-by-side receipts with the exact versions each run read from Atlas. |
+| 1 Past experiments | The `insert` commands and change-stream events behind the experiments list. The weights are GridFS files. |
+| 2 Ask Claude Code | The one `$vectorSearch` aggregate with the `project_id` filter, hits and latency, plus the `$lookup` and the fit labels. |
+| 3 You decide | The conditional `findOneAndUpdate` from `pending` to `approved`, and the 409 on a second click. |
+| 4 Result | The `resolve` re-check of cited versions, the GridFS weights stream, the receipt update and the new `insert`, pushed to the screen by a change stream. |
 
-Settings shows the isolation check as two real commands: the same `$vectorSearch` with the other project's filter returning nothing, and the direct `find` returning no document.
+Use distinct text labels for worked, failed, crashed and doesn't fit. Show conditions before outcomes. Support keyboard use, visible focus, and loading, empty and error states. On narrow screens the drawer is full width.
 
-A right-hand evidence inspector follows the current stage or selection: conditions first, then outcome labels (execution, validity, direction), metric and threshold, evidence receipt with the rerun command, applicability, provenance and version. For a decision it shows the cited versions, skipped jobs, ruled-out findings, approval and the receipt. Use distinct text labels for a valid negative, a crash and a mismatch. Show conditions before the outcome. Support keyboard use, visible focus, and loading, empty and error states. On narrow screens the inspector stacks below.
+## Phase 2: governance
+
+Correction, expiry and history are already in the backend (`correct`, `expire`, `history`, `result_versions`). They return to the screen after the four-stage demo is rehearsed: a Correct and an Expire action on an experiment's drawer, each followed by asking Claude Code again, and a version history in the drawer. Keep this off the main path until then.
 
 ## Credits
 
@@ -223,5 +229,7 @@ A right-hand evidence inspector follows the current stage or selection: conditio
 | --- | --- | --- |
 | [ARA](https://github.com/ARA-Labs/Agent-Native-Research-Artifact/tree/e52a925e9d03b4ada3008653e72f99b04116fca2) at `e52a925e9d03b4ada3008653e72f99b04116fca2`, MIT, Orchestra Research | Dead ends kept as first-class records with a reason; results bound to code, config and evidence. The ResNet example artifact is our pitch example. | Ideas and pitch only. No code, data or runtime in the app. |
 | [AutoSci](https://github.com/PKU-DAIR/AutoSci/tree/6bc834a805a1744959a9983809e5d6f0263ef791) at `6bc834a805a1744959a9983809e5d6f0263ef791`, MIT, OmegaWiki Contributors | A list of failed ideas with reasons that agents don't revisit (`/ideate`). We scope it by conditions. | Idea only. |
+| [PyTorch](https://pytorch.org) and [torchvision](https://github.com/pytorch/vision) | ResNet-18 architecture, ImageNet weights `ResNet18_Weights.IMAGENET1K_V1`, and the CIFAR-10 loader. | Used as libraries. Their licenses apply. |
 
-P2 adds `NOTICE.md` with these credits and links. Platform, presenter, benchmark, harness and UI are event-built.
+See [NOTICE.md](NOTICE.md). The platform, presenter, benchmark, UI and mockup are event-built.
+
