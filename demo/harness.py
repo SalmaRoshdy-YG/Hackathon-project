@@ -48,7 +48,7 @@ def subprocess_service(target, port, logfile, *, cwd=None):
 
 
 @contextmanager
-def fixture(out, prefix="check", *, profile="benchmark.profile", cwd=None):
+def fixture(out, prefix="check", *, profile=None, cwd=None):
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     project = f"{prefix}-{uuid4().hex[:12]}"
@@ -63,7 +63,7 @@ def fixture(out, prefix="check", *, profile="benchmark.profile", cwd=None):
     env["MEMORY_TOKENS_JSON"] = json.dumps(mapping)
     port = free_port()
     env["MEMORY_EXPERIMENT_MODULE"] = profile or ""
-    env["MEMORY_PRESENTATION_MODULE"] = "demo.compression" if profile == "benchmark.profile" else ""
+    env["MEMORY_PRESENTATION_MODULE"] = ""
     env["MEMORY_API_URL"] = f"http://127.0.0.1:{port}"
     prior = {key: os.environ.get(key) for key in env}
     os.environ.update(env)

@@ -4,10 +4,8 @@ from datetime import timedelta
 from pathlib import Path
 from time import monotonic
 
-from benchmark.agent import ref
 from platform_api.client import require, save
-from benchmark.publish import document, replacement
-from benchmark.run import QUESTION, TASK, measure
+from tests.lookup_profile import QUESTION, TASK, finding, replacement, run
 from demo.common import client, run_agent
 from demo.harness import fixture, wait_for
 from platform_api.config import utcnow
@@ -20,6 +18,11 @@ def path(ref_, suffix=""):
 
 def search(api):
     return require(api.post("/v1/search", json={"question": QUESTION, "conditions": TASK}))["candidates"]
+
+
+def ref(row):
+    result = row["result"]
+    return {"result_id": result["result_id"], "version": result["version"]}
 
 
 def has(rows, target):
@@ -42,7 +45,7 @@ def audit(store, project):
         return any(row["result_id"] == target["result_id"] and row["version"] == target["version"]
                    for row in store.db.result_vectors.aggregate([stage, {"$project": {
                        "result_id": 1, "version": 1}}]))
-    payload = document(measure("dict-a-l1", "A", "calibration"), "promising")
+    payload = finding(run("binary", {**TASK, "phase": "calibration"}))
     with client("publisher") as a, client("reader") as b, client("maintainer") as human, \
             client("other") as other, client("other_publisher") as other_a:
         assert require(b.get("/v1/health"))["index"] == "READY"
@@ -63,13 +66,13 @@ def audit(store, project):
         for end in ("", "/evidence", "/history"):
             assert other.get(path(own, end)).status_code == 404
             assert b.get(path(foreign, end)).status_code == 404
-        edit = {"expected_version": 1, "reason": "Receipt belongs to cohort B", "replacement": replacement()}
+        edit = {"expected_version": 1, "reason": "Receipt used different sort order", "replacement": replacement()}
         assert other_a.post(path(own, "/correct"), json=edit).status_code == 404
         assert b.post(path(own, "/correct"), json=edit).status_code == 403
         assert b.post("/v1/results", json=payload).status_code == 403
         assert b.post("/v1/results", json={**payload, "project_id": project}).status_code == 422
         assert other.post("/v1/resolve", json={"refs": [own]}).status_code == 404
-        decision = run_agent("benchmark.agent", "MEMORY_READER_TOKEN", "--memory", "on")
+        decision = run_agent("tests.lookup_profile", "MEMORY_READER_TOKEN", "--memory", "on")
         did = f"/v1/decisions/{decision['decision_id']}"
         assert other.get(did).status_code == 404
         assert other.post(did+"/approve", json={}).status_code == 404
@@ -94,11 +97,11 @@ def audit(store, project):
         fresh = wait_for(lambda: search(b), lambda rows: has(rows, v2), "corrected version indexed")
         assert raw_index_has(own) and not has(fresh, own)
         assert next(x["applicability"]["mismatches"] for x in fresh if ref(x) == v2) == [
-            {"field": "cohort", "wanted": "A", "found": "B"}]
+            {"field": "layout", "wanted": "sorted", "found": "different-sort"}]
         empty = []
         mismatched = next(row for row in fresh if ref(row) == v2)
         invalid = {"request": "Prove mismatched evidence cannot authorize a job", "memory": "on",
-                   "conditions": TASK, "job_id": "plain-l1", "used_refs": [v2],
+                   "conditions": TASK, "job_id": "linear", "used_refs": [v2],
                    "candidates": [{"ref": v2, "score": mismatched["score"],
                                    "applicability": mismatched["applicability"]}],
                    "skipped_jobs": empty, "rejected_candidates": empty, "reason": "Negative check", "model": "test"}
@@ -137,7 +140,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", default="receipts/preflight")
     args = parser.parse_args()
-    with fixture(args.out, "preflight") as (store, project):
+    with fixture(args.out, "preflight", profile="tests.lookup_profile") as (store, project):
         save(audit(store, project), Path(args.out)/"summary.json")
 
 

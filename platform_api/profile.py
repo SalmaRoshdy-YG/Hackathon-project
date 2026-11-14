@@ -9,7 +9,6 @@ from pydantic import TypeAdapter
 
 from platform_api.models import Conditions, JobID, Tag
 
-LEGACY_PROFILE_ID = "compression-v1"
 CONDITION_KEY = re.compile(r"[a-zA-Z_][a-zA-Z0-9_-]{0,79}")
 
 

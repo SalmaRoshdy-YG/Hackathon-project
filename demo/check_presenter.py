@@ -12,7 +12,7 @@ from demo.harness import fixture, free_port, subprocess_service, wait_for
 
 
 def smoke(out):
-    with fixture(out, "presenter"):
+    with fixture(out, "presenter", profile="tests.lookup_profile"):
         port = free_port()
         base = f"http://127.0.0.1:{port}"
         with subprocess_service("demo.presenter:app", port, out/"presenter.log") as proc, \
@@ -74,10 +74,10 @@ def smoke(out):
                 assert web.post("/demo/agent-a", headers={"Origin": "https://other.invalid"}).status_code == 403
                 producer = post("/agent-a")
                 producer_done = monotonic()
-                timings["four_publications"] = max(
+                timings["publications"] = max(
                     changed(result, producer_done, "results", "result_id", operation="insert")
                     for result in producer["refs"].values())
-                promised, negative = (producer["refs"][k] for k in ("promising", "negative"))
+                promised, negative = (producer["refs"][k] for k in ("support", "failed"))
                 initial_job = post("/agent-b", {"memory": "off"})
                 rid = f"/decisions/{initial_job['decision_id']}"
                 assert web.post("/demo"+rid+"/execute").status_code == 409
@@ -86,7 +86,7 @@ def smoke(out):
                 timings["approval"] = changed(initial_job, start, "decisions", "decision_id", status="approved")
                 baseline = post(rid+"/execute")["receipt"]
                 on = post("/agent-b", {"memory": "on"})
-                assert len(on["evidence_candidates"]) == 3 and on["job_id"] == "dict-a-l6"
+                assert len(on["evidence_candidates"]) == 2 and on["job_id"] == "binary"
                 reject_path = f"/decisions/{on['decision_id']}"
                 assert post(reject_path+"/reject")["status"] == "rejected"
                 assert web.post("/demo"+reject_path+"/execute").status_code == 409
@@ -94,15 +94,15 @@ def smoke(out):
                 rid = f"/decisions/{on['decision_id']}"
                 post(rid+"/approve")
                 live = post(rid+"/execute")["receipt"]
-                assert live["output_bytes"] < baseline["output_bytes"]
+                assert live["metric"]["value"] < baseline["metric"]["value"]
 
                 start = monotonic()
                 v2 = post("/governance/correct", {"result_id": promised["result_id"], "expected_version": 1,
-                    "reason": "Receipt belongs to cohort B"})
+                    "reason": "Receipt used different sort order"})
                 timings["correction"] = changed(v2, start, "results", "result_id",
                                                operation="update", version=2)
                 corrected = post("/rerun")
-                assert corrected["job_id"] == "plain-l1" and v2 in [
+                assert corrected["job_id"] == "linear" and v2 in [
                     row["ref"] for row in corrected["rejected_candidates"]]
                 rid = f"/decisions/{corrected['decision_id']}"
                 post(rid+"/approve")
@@ -114,7 +114,7 @@ def smoke(out):
                 timings["expiry"] = changed(expired, start, "results", "result_id",
                                             operation="update", status="expired")
                 rerun = post("/rerun")
-                assert rerun["job_id"] == "plain-l1" and negative not in [r["ref"] for r in rerun["candidates"]]
+                assert rerun["job_id"] == "linear" and negative not in [r["ref"] for r in rerun["candidates"]]
                 rid = f"/decisions/{rerun['decision_id']}"
                 post(rid+"/approve")
                 post(rid+"/execute")
@@ -129,7 +129,7 @@ def smoke(out):
                 event("atlas", lambda d: d["command"] == "findAndModify" and d["collection"] == "results"
                       and "expires_at" in d["shape"]["updates"][0]["fields"], "expiry command")
                 pipeline = event("atlas", lambda d: d["collection"] == "result_vectors"
-                                 and d["command"] == "aggregate" and d["docs"] == 3, "real Atlas search")["shape"]["pipeline"]
+                                 and d["command"] == "aggregate" and d["docs"] == 2, "real Atlas search")["shape"]["pipeline"]
                 assert pipeline[0]["$vectorSearch"]["queryVector"] == "[1536 floats]"
                 assert pipeline[0]["$vectorSearch"]["filter"]["project_id"] == "[trusted project]"
                 assert sum("$lookup" in stage for stage in pipeline) == 1

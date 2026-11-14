@@ -34,7 +34,7 @@ Example body for `POST /v1/results`. Evidence is a small inline JSON receipt. Th
   "validity": "valid",
   "direction": "positive",
   "evidence": {"kind": "job_receipt", "data": {"run_id": "cal-a-1", "input_bytes": 928, "output_bytes": 242, "roundtrip_ok": true,
-    "reproduce": {"command": "python -m benchmark.run --job dict-a-l1 --cohort A --split calibration", "fixture_sha256": "<hex>", "dictionary_sha256": "<hex>", "zlib_version": "1.3.1", "python_version": "3.11.9"}}},
+    "reproduce": {"command": "python -m your_experiment.run", "fixture_sha256": "<hex>", "dictionary_sha256": "<hex>", "zlib_version": "1.3.1", "python_version": "3.11.9"}}},
   "source": {"system": "benchmark", "source_agent": "agent-a", "record": "dict-a-l1"},
   "expires_at": "2026-11-15T00:00:00Z"
 }
@@ -110,47 +110,13 @@ db.result_vectors.aggregate([
 
 ## Experiment profiles
 
-The API starts with its memory and governance endpoints. Configure a trusted server-side experiment to enable execution using `MEMORY_EXPERIMENT_MODULE`. Job IDs, baseline, task validation, match fields, evidence support, and the runner come from the profile. The selected profile ID is persisted in decisions and checked again before dispatch. The optional presenter loads its workflow from `MEMORY_PRESENTATION_MODULE`. The example below uses the compression profile. See [BACKEND.md](BACKEND.md#switch-experiments) for the adapter contract and the verified lookup example.
+The API starts with its memory and governance endpoints. Configure a trusted server-side experiment to enable execution using `MEMORY_EXPERIMENT_MODULE`. Job IDs, baseline, task validation, match fields, evidence support, and the runner come from the profile. The selected profile ID is persisted in decisions and checked again before dispatch. The optional presenter loads its workflow from `MEMORY_PRESENTATION_MODULE`. The earlier compression example was retired when the team selected a different experiment. See [BACKEND.md](BACKEND.md#switch-experiments) for the adapter contract and the verified lookup example.
 
-## Benchmark and agent decision
+## Experiment and agent decision
 
-Use `short-events-v1`, a synthetic independent-event compression fixture. Each message is compressed on its own, as if sent one at a time. A pre-shared dictionary models a receiver that already knows the deployment's event vocabulary. Count all zlib stream bytes, including headers and the dictionary ID. Dictionary distribution is a fixed setup cost outside the per-message metric and should be disclosed in the demo. No model is trained anywhere.
+The next experiment supplies the job catalog, baseline, fixture and measurements. Use the same task conditions, catalog, and budget for memory-off and memory-on comparisons. Publish measured outcomes with provenance. Retrieve applicable evidence from a fresh consumer session, cite exact versions, and require approval before dispatch. Correct one result and expire another, then rerun to show changes to evidence and decisions.
 
-Generate 32 ASCII tokens per cohort A and B using the first 24 hex characters of SHA-256 of `"{cohort}:{i}"` for indices 0–31. Join each cohort's 32 tokens with `|` for its pre-shared `phrases-v1` dictionary. Make eight rows per split, each the first 16 hex characters of SHA-256 of `"{cohort}:{split}:{j}"` followed by four tokens, all joined by `|`. Use token indices `(4*j + offset + k) % 32`, where `j=0..7`, `k=0..3`, and offset is 0 for `calibration` and 1 for `holdout`. Each split has 928 input bytes. Compress each row in its own `zlib.compressobj(level, zlib.DEFLATED, 15, **kwargs)` stream, with `zdict` only for dictionary jobs. Decompress with identical dictionary and window settings and verify exact equality and end-of-stream for all rows. Score `wire_ratio = sum(output_bytes) / sum(input_bytes)` with `<= 0.40` as success. Record the rerun command, fixture and dictionary hashes, and zlib and Python versions in the receipt.
-
-| Agent A run | Input | Configuration | Planning probe |
-| --- | --- | --- | --- |
-| Promising finding | A calibration | `dict-a-l1`, level 1, dictionary A | 242/928, positive |
-| Failed approach | A calibration | `dict-b-l1`, level 1, dictionary B | 760/928, completed valid negative with all rows decoded |
-| Other cohort | B calibration | `dict-b-l1`, level 1, dictionary B | 234/928, positive under cohort B |
-| Crashed run | A calibration | `dict-c-l1`, dictionary C, which is not provisioned | Runner fails before measuring: `crashed / invalid / undetermined`, null metric |
-
-Agent A runs these four jobs, turns each runner receipt into a publish body with `python -m benchmark.publish`, publishes with its own token, then exits. The crashed run shows humans that a crash is labelled differently from a failed idea; search never returns it.
-
-Agent B uses the same request, conditions, one-job budget, prompt and ordered catalog every time. Request: “Can we get individually transmitted cohort A telemetry well under half its original size on unseen events? Aim for 40% or less and spend one trial.” Search question: “What previously helped shrink one-at-a-time cohort A telemetry packets?” A's published text uses “independent DEFLATE event payloads” and “shared phrase dictionaries”, so finding it needs search by meaning. Smoke-check the paraphrase in a set with five unrelated valid findings and the cohort B finding. The required findings must be among the candidates, and at least one applicable finding must rank above all unrelated ones.
-
-Demo and rehearsal states run in this order in one project, with the same request each time:
-
-| State | What changed | Expected recommendation on A holdout | Planning probe |
-| --- | --- | --- | --- |
-| Memory off | B skips search | `plain-l1`, no dictionary | 686/928 |
-| Memory on | — | `dict-a-l6`. Cites the promising finding v1 and the failed approach v1. Skips `dict-b-l6` because dictionary B failed on cohort A. Rejects the cohort B finding as a mismatch. | 238/928 |
-| After correction | Maintainer corrects the promising finding: the receipt belonged to cohort B. v2 is the measured `dict-a-l1` on B calibration (probe 760/928, valid negative). | `plain-l1`. v2 now shows as a cohort mismatch. Dictionary B still skipped because of the failed approach. | 686/928 |
-| After correction and expiry | Maintainer expires the failed approach (“Superseded by newer measurements”). | `plain-l1`. The failed approach is no longer among the candidates and shows as Expired in the UI. `dict-b-l6` is now skipped for lack of applicable evidence instead of a known failure. | 686/928 |
-
-The job changes once (on → after correction). The expiry changes the evidence and the skip reasons visibly, but not the job, because nothing applicable supports a dictionary by then. Say so in the demo. Scheduled expiry (an `expires_at` that passes on its own) is tested separately in the lifecycle gate, not in the live demo.
-
-The third candidate, `dict-b-l6`, measured 760/928 on A holdout in the probe. Measure it during fixture validation so every candidate is accounted for. Each finding should land on the expected side of the threshold. Byte counts can vary by zlib version, which the runner records.
-
-The catalog order is `plain-l1`, `dict-a-l6`, `dict-b-l6`. The no-evidence baseline is the dictionary-free job because it assumes no shared receiver vocabulary. B fetches each candidate's versioned evidence before deciding and attaches the measurement and the platform's applicability label to the model context. In OpenAI mode, use one stateless `gpt-4.1-mini-2025-04-14` Responses request per decision with a JSON schema for `job_id`, `used_refs`, `skipped_jobs` with reasons and refs, `rejected_candidates` with refs and reasons, and `reason`. Instructions favor a bounded follow-up with applicable support, then the baseline. Level 1 supports testing the same dictionary family at level 6. A valid negative discourages repeating that dictionary family under the same conditions and is advisory across compression levels. Only results labelled `applies` may appear in `used_refs` or as reasons for skips; the platform rejects the decision otherwise. Keep mismatched refs in `rejected_candidates`. [Planner model](https://developers.openai.com/api/docs/models/gpt-4.1-mini)
-
-P3 owns:
-- `python -m benchmark.run --job dict-a-l6 --cohort A --split holdout`: one measured run, receipt to stdout.
-- `python -m benchmark.publish --out receipts/producer.json`: Agent A's four runs and publishes. Accepts `--project-token-env`.
-- `python -m benchmark.agent --memory on --base-url http://127.0.0.1:8000 --out receipts/on.json`: Agent B searches, decides and posts the proposal. Prints the `decision_id`. Never executes. `--memory off` skips search.
-- `python -m benchmark.execute --decision ID`: requests trusted execution and prints the resulting decision and receipt; the platform atomically claims the approval, resolves the cited refs, runs the registered configuration once, and stores the receipt.
-
-The tested rules mode is stateless and uses the same evidence-first policy, task, catalog and budget for every state. B reads its token from `MEMORY_TOKEN`. Receipts include request, model, catalog and budget, candidates with applicability, selected and skipped jobs, exact used refs, approval, executed configuration, runtime, status, metric, byte counts, hashes and round-trip evidence. The planning arithmetic above came from a local Python 3.11 standard-library probe. Build acceptance requires receipts from the new runner.
+The ordered lookup fixture under tests is used only for the integration checks. Configure the actual experiment by following [BACKEND.md](BACKEND.md#switch-experiments).
 
 ## Presenter service
 
@@ -160,12 +126,12 @@ P2 owns `uvicorn demo.presenter:app --host 127.0.0.1 --port 8100`. It serves the
 | --- | --- |
 | `GET /demo/state` | Current stage, health from `GET /v1/health`, project, memory setting, findings from `GET /v1/results`, latest decision and receipts. |
 | `GET /demo/events` | Server-sent events: `change` events from the change streams (operation, collection, result or decision ID, version, status) and `atlas` events from the command listener (command, collection, ms, docs, redacted shape). The UI subscribes once on load. |
-| `POST /demo/agent-a` | Runs `benchmark.publish` with A's token. |
-| `POST /demo/agent-b` | `{"memory":"on|off"}`. Runs `benchmark.agent` with B's token. Returns the pending decision. |
+| `POST /demo/agent-a` | Runs the configured producer with A's token. |
+| `POST /demo/agent-b` | `{"memory":"on|off"}`. Runs the configured planner with B's token. Returns the pending decision. |
 | `POST /demo/rerun` | Repeats B's last request with the same memory setting. |
 | `POST /demo/decisions/{id}/approve` and `/reject` | Forwards with the maintainer token. |
-| `POST /demo/decisions/{id}/execute` | Uses the same trusted platform dispatcher as `benchmark.execute`. |
-| `POST /demo/governance/correct` | `{"result_id":…,"expected_version":…,"reason":…}`. Uses the prepared cohort B replacement from P3's receipt. |
+| `POST /demo/decisions/{id}/execute` | Calls the platform dispatcher. |
+| `POST /demo/governance/correct` | `{"result_id":…,"expected_version":…,"reason":…}`. Uses the replacement supplied by the presentation profile. |
 | `POST /demo/governance/expire` | `{"result_id":…,"expected_version":…,"reason":…}`. |
 | `GET /demo/results/{id}/history` | Forwards the history route. |
 | `GET /demo/results/{id}/evidence?version=1` | Forwards the scoped, current evidence route. |

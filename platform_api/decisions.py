@@ -6,7 +6,6 @@ from pymongo import ReturnDocument
 from pymongo.errors import PyMongoError
 
 from platform_api.models import Proposal
-from platform_api.profile import LEGACY_PROFILE_ID
 from platform_api.config import utcnow
 from platform_api.store import error
 
@@ -116,7 +115,7 @@ class Decisions:
     def dispatch(self, identity, decision_id):
         existing = self.can_dispatch(identity, decision_id)
         experiment = self.execution_profile()
-        if (existing.get("experiment_id", LEGACY_PROFILE_ID) != experiment.id
+        if (existing.get("experiment_id") != experiment.id
                 or existing["catalog"] != list(experiment.catalog)):
             error(409, "decision_experiment_changed")
         plan = Proposal.model_validate({field: existing[field] for field in Proposal.model_fields})
