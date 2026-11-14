@@ -30,8 +30,11 @@ def main():
     parser = argparse.ArgumentParser(description="Run the handwritten-digit experiment.")
     parser.add_argument("command", choices=["probe", "seed", "off", "on"])
     parser.add_argument("--seed", type=int, default=1, help="Training random seed")
+    parser.add_argument("--seed-file", type=Path, help="Private operator JSON for the seed command")
     parser.add_argument("--out", type=Path, help="Save the JSON receipt")
     args = parser.parse_args()
+    if (args.command == "seed") != (args.seed_file is not None):
+        parser.error("Use --seed-file only with the seed command. The seed command requires it.")
 
     if args.command in ("on", "seed"):
         required = ["MEMORY_ATLAS_URI", "MEMORY_ATLAS_DB"]
@@ -43,7 +46,7 @@ def main():
     if args.command == "probe":
         result = [train_digits(job, args.seed) for job in ("plain", "shortcut")]
     elif args.command == "seed":
-        result = seed_memory()
+        result = seed_memory(args.seed_file)
     else:
         evidence = retrieve() if args.command == "on" else []
         prompt = (
@@ -71,5 +74,5 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except (EOFError, RuntimeError, ValueError) as error:
+    except (EOFError, OSError, RuntimeError, ValueError) as error:
         sys.exit(str(error) or "No decision received.")

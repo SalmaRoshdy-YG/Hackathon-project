@@ -1,3 +1,4 @@
+import json
 import os
 
 from pymongo import MongoClient
@@ -7,21 +8,6 @@ from pymongo.operations import SearchIndexModel
 COLLECTION = "digits_demo_memory_minilm"
 INDEX = "digits_minilm_evidence_v1"
 EMBEDDING = "sentence-transformers/all-MiniLM-L6-v2"
-SOURCE = (
-    "https://github.com/ARA-Labs/Agent-Native-Research-Artifact/blob/"
-    "e52a925e9d03b4ada3008653e72f99b04116fca2/examples/resnet-ara-example/"
-    "evidence/tables/table2_imagenet_plain_vs_residual.md"
-)
-EVIDENCE = {
-    "id": "ara-resnet-table2-v1",
-    "source": SOURCE,
-    "dataset": "ImageNet validation",
-    "finding": (
-        "At 34 layers, the plain model had 28.54% top-1 error and the model "
-        "with shortcut connections had 25.03% top-1 error. The compared models "
-        "had the same parameter count."
-    ),
-}
 QUERY = (
     "What past image classification experiments tested ways to improve "
     "accuracy when training a deep network without adding parameters?"
@@ -39,14 +25,22 @@ def embed(value):
     return model.encode(value, normalize_embeddings=True).tolist()
 
 
-def seed_memory():
-    vector = embed(EVIDENCE["dataset"] + ". " + EVIDENCE["finding"])
+def seed_memory(seed_path):
+    evidence = json.loads(seed_path.read_text(encoding="utf-8-sig"))
+    fields = {"id", "source", "dataset", "finding"}
+    if (
+        not isinstance(evidence, dict)
+        or evidence.keys() != fields
+        or any(not isinstance(value, str) or not value.strip() for value in evidence.values())
+    ):
+        raise ValueError("Seed JSON must contain nonempty id, source, dataset, and finding strings.")
+    vector = embed(evidence["dataset"] + ". " + evidence["finding"])
 
     with mongo_client() as mongo:
         collection = mongo[os.environ["MEMORY_ATLAS_DB"]][COLLECTION]
         collection.update_one(
-            {"_id": EVIDENCE["id"]},
-            {"$setOnInsert": {"evidence": EVIDENCE, "embedding": vector}},
+            {"_id": evidence["id"]},
+            {"$setOnInsert": {"evidence": evidence, "embedding": vector}},
             upsert=True,
         )
         indexes = list(collection.list_search_indexes(INDEX))
@@ -61,7 +55,7 @@ def seed_memory():
                     "similarity": "cosine",
                 }]},
             ))
-    return {"seeded": EVIDENCE["id"], "index": INDEX, "note": "Wait for the index to be queryable."}
+    return {"index": INDEX, "note": "Wait for the index to be queryable."}
 
 
 def retrieve():
