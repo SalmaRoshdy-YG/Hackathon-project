@@ -2,7 +2,7 @@
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<!-- Clickable demo mockup. Runs in the browser with simulated data from the planning probe; the real app follows PLATFORM.md. -->
+<!-- Clickable demo mockup: ResNet-50 on ImageNet with shared memory of results and saved weights. All numbers are simulated mockup data. -->
 <style>[hidden]{display:none!important}body{margin:0}</style>
 <title>Precedent Research Memory</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -112,10 +112,10 @@ p{margin:0}
 
 .bar{position:relative;height:10px;border-radius:5px;background:var(--sunk)}
 .bar i{position:absolute;inset:0 auto 0 0;border-radius:5px;background:var(--fill,var(--pos));transition:width .8s cubic-bezier(.2,.7,.2,1)}
-.bar s{position:absolute;top:-4px;bottom:-4px;left:40%;width:2px;background:var(--ink);text-decoration:none}
+.bar s{position:absolute;top:-4px;bottom:-4px;left:75%;width:2px;background:var(--ink);text-decoration:none}
 .bar.lg{height:20px;border-radius:10px}.bar.lg i{border-radius:10px}
 .legend{display:flex;justify-content:space-between;font:400 11px var(--f-mono);color:var(--muted);margin-top:4px;position:relative}
-.legend .thr{position:absolute;left:40%;transform:translateX(-50%);color:var(--ink);font-weight:500}
+.legend .thr{position:absolute;left:75%;transform:translateX(-50%);color:var(--ink);font-weight:500}
 
 .quote{font:500 19px/1.4 var(--f-display);max-width:46ch}
 .agent{display:flex;align-items:center;gap:9px}
@@ -200,6 +200,35 @@ pre.code{background:var(--code-bg);color:var(--code-fg);font:12px/1.55 var(--f-m
 .vers{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .ver{border:1px solid var(--line);border-radius:10px;padding:10px;font-size:12.5px;display:flex;flex-direction:column;gap:4px}
 .ver.cur{border-color:var(--green)}
+
+/* embedded terminal + experiment highlight */
+.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:14px;align-items:start}
+@media (max-width:1100px){.split{grid-template-columns:minmax(0,1fr)}}
+.term{background:var(--code-bg);color:var(--code-fg);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;min-width:0;box-shadow:var(--shadow)}
+.term .bar-t{display:flex;align-items:center;gap:7px;padding:9px 12px;background:#0A1A14;font:500 11.5px var(--f-mono);color:var(--code-c)}
+.term .bar-t i{width:10px;height:10px;border-radius:50%;background:#2E4A3E;display:inline-block}
+.term .bar-t span{margin-left:6px}
+.term .body{padding:12px 14px;font:12.5px/1.65 var(--f-mono);max-height:420px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}
+.term .you{color:#9EE6C2}.term .you::before{content:"> ";color:var(--mint)}
+.term .cl::before{content:"⏺ ";color:#E8C08A}
+.term .tool{color:var(--code-c)}.term .tool::before{content:"  ⎿ "}
+.term .out{color:#C9D7D0}.term .good{color:#7FD8AC}.term .badv{color:#F2A27C}
+.term .inrow{display:flex;gap:8px;padding:10px 12px;border-top:1px solid #1E3A2F;align-items:center}
+.term .inrow b{color:var(--mint);font:600 13px var(--f-mono)}
+.term .inrow input{flex:1;min-width:0;background:transparent;border:0;color:#E4F1EA;font:12.5px var(--f-mono);outline:none}
+.term .inrow button{border:1px solid var(--mint);background:transparent;color:var(--mint);border-radius:7px;padding:5px 10px;font:600 12px var(--f-body);cursor:pointer}
+.term .inrow button:hover{background:rgba(95,211,154,.12)}
+.term .inrow button.no{border-color:#F2A27C;color:#F2A27C}
+.xlist{display:flex;flex-direction:column;gap:8px}
+.xrow{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface);cursor:pointer;text-align:left;width:100%;transition:border-color .3s,background .3s,box-shadow .3s}
+.xrow:hover{border-color:var(--muted)}
+.xrow .t{flex:1;min-width:0;font-weight:600;font-size:13.5px}
+.xrow .t small{display:block;font-weight:400;color:var(--muted);font-size:12px}
+.xrow.use{border-color:var(--green);background:#F2FAF5;box-shadow:0 0 0 2px var(--green-soft)}
+.xrow.avoid{border-color:#E8B79B;background:#FDF6F2}
+.xrow.nofit{opacity:.7}
+.xrow.new{border-color:var(--b);box-shadow:0 0 0 2px var(--b-soft)}
+
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 
@@ -216,8 +245,8 @@ pre.code{background:var(--code-bg);color:var(--code-fg);font:12px/1.55 var(--f-m
       <button data-page="settings"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10" cy="10" r="2.6"/><path d="M10 2.5v2.2M10 15.3v2.2M2.5 10h2.2M15.3 10h2.2M4.7 4.7l1.6 1.6M13.7 13.7l1.6 1.6M4.7 15.3l1.6-1.6M13.7 6.3l1.6-1.6"/></svg>Settings</button>
     </nav>
     <div class="side-foot">
-      <div class="atlas-pill"><span class="dot"></span><div>MongoDB Atlas<small>connected · team-run-01</small></div></div>
-      <div class="mockflag">Mockup · numbers from the team’s planning probe</div>
+      <div class="atlas-pill"><span class="dot"></span><div>MongoDB Atlas<small>connected · vision-research</small></div></div>
+      <div class="mockflag">Mockup · simulated numbers and terminal</div>
     </div>
   </aside>
 
@@ -233,30 +262,42 @@ pre.code{background:var(--code-bg);color:var(--code-fg);font:12px/1.55 var(--f-m
 </div>
 
 <script>
-/* ---------- model ---------- */
-const IN = 928, THR = 0.40;
-const JOBS = {'plain-l1':{level:1,family:'none',desc:'No dictionary',out:686},'dict-a-l6':{level:6,family:'A',desc:'Dictionary A, stronger setting',out:238},'dict-b-l6':{level:6,family:'B',desc:'Dictionary B, stronger setting',out:760}};
-const REQUEST = 'Can we make each cohort A message 40% of its size or less? You get one try.';
+/* ---------- mockup data: ResNet-50 on ImageNet; Claude Code works through the embedded terminal ---------- */
+const TARGET = 0.75;
+const BASELINE = {id:'baseline',label:'Claude Code on its own',job:'scratch',acc:.41,gpu:8,outside:true};
+const JOBS = {
+  'warm-start':{label:'Retrain from stored weights',acc:.763,gpu:0.6},
+  'scratch':{label:'Train from scratch',acc:.41,gpu:8},
+};
+const TASK = {dataset:'ImageNet-1k (1,000 classes)',model:'ResNet-50',image:'224 px'};
 const SEED = [
-  {key:'promising',id:'7f3a9c12',title:'Dictionary A worked on cohort A',job:'dict-a-l1',family:'A',cohort:'A',out:242,exec:'completed',valid:'valid',dir:'positive',score:.86},
-  {key:'failed',id:'b21e07d4',title:'Dictionary B failed on cohort A',job:'dict-b-l1',family:'B',cohort:'A',out:760,exec:'completed',valid:'valid',dir:'negative',score:.83},
-  {key:'other',id:'c94f5a61',title:'Dictionary B worked on cohort B',job:'dict-b-l1',family:'B',cohort:'B',out:234,exec:'completed',valid:'valid',dir:'positive',score:.81},
-  {key:'crash',id:'e05d8b33',title:'Dictionary C run crashed',job:'dict-c-l1',family:'C',cohort:'A',out:null,exec:'crashed',valid:'invalid',dir:'undetermined',error:'Dictionary C was not installed, so nothing was measured.'},
+  {key:'ckpt',id:'7f3a9c12',agent:'vision-agent-1',team:'Vision team',title:'ResNet-50 reached 76.1% on ImageNet',dataset:TASK.dataset,model:'ResNet-50',image:'224 px',
+    settings:'90 epochs · learning rate 0.1 with warmup · batch 256',acc:.761,gpu:'≈ 200 GPU-hours',dir:'positive',exec:'completed',score:.88,
+    weights:{file:'resnet50_in1k_v1.pt',size:'98 MB',src:'torchvision package · ResNet50_Weights.IMAGENET1K_V1',id:'6731…b2e0'}},
+  {key:'fastlr',id:'b21e07d4',agent:'vision-agent-2',team:'Vision team',title:'High learning rate without warmup collapsed',dataset:TASK.dataset,model:'ResNet-50',image:'224 px',
+    settings:'learning rate 0.8 · no warmup · batch 256',acc:.094,gpu:'8 GPU-hours',dir:'negative',exec:'completed',score:.84},
+  {key:'cifar',id:'c94f5a61',agent:'robotics-agent',team:'Robotics lab',title:'ResNet-50 reached 95% on CIFAR-10',dataset:'CIFAR-10 (10 classes)',model:'ResNet-50',image:'32 px',
+    settings:'200 epochs · tiny 32 px images',acc:.952,gpu:'≈ 6 GPU-hours',dir:'positive',exec:'completed',score:.81,weights:{file:'resnet50_cifar10.pt',size:'94 MB',src:'trained by robotics-agent',id:'6731…9c41'}},
+  {key:'crash',id:'e05d8b33',agent:'eval-agent',team:'Platform team',title:'Batch-2048 run crashed',dataset:TASK.dataset,model:'ResNet-50',image:'224 px',
+    settings:'batch 2048 on one GPU',acc:null,gpu:'—',dir:'undetermined',exec:'crashed',error:'Out of GPU memory in the first step. Nothing was measured.'},
+  {key:'paper',id:'a8d14e70',agent:'ResNet paper',team:'Imported · He et al., 2015',title:'Deeper networks without shortcuts got worse',dataset:TASK.dataset,model:'Plain CNN',image:'224 px',
+    settings:'plain 18 vs 34 layers',acc:null,accText:'27.94% → 28.54% error',gpu:'—',dir:'negative',exec:'completed',background:true},
 ];
-const CORRECTION = {title:'Dictionary A failed on cohort B',cohort:'B',out:760,dir:'negative',score:.79,reason:'The receipt belonged to cohort B, not A'};
-const STAGES = ['Agent A discovers','MongoDB remembers','Agent B recommends','Human approves','Agent B executes','Governance','Updated decision'];
+const CORRECTION = {title:'ResNet-50 record pointed at 100-class weights',dataset:'ImageNet-100 (100 classes)',reason:'The weights file linked to this record was a 100-class fine-tune, not the 1,000-class model'};
+const STAGES = ['Past experiments','Claude Code gathers evidence','You decide what to run','Claude Code retrains','Governance','What changed'];
+const PROMPT1 = 'Build on what’s known about training ResNet-50 on ImageNet. Target 75%, budget 8 GPU-hours. Show me which past experiments you’d use.';
 
 let clock = new Date(Date.UTC(2026,10,14,18,38,0));
 const tick = s => { clock = new Date(clock.getTime()+s*1000); return clock.toISOString().slice(11,19); };
 const now = () => clock.toISOString().slice(11,19);
-const S = {page:'demo',stage:1,memory:'on',findings:{},order:[],events:[],search:null,decision:null,receipts:[],sel:null,toast:null,q:'',isolation:false,n:0};
-const ratio = f => f.out==null?null:f.out/IN;
-const pct = x => Math.round(x*100)+'%';
+const S = {page:'demo',stage:1,findings:{},order:[],events:[],search:null,decision:null,receipts:[],sel:null,toast:null,q:'',isolation:false,n:0,term:[],context:null,busy:false,pending:null};
+const pct = x => (Math.round(x*1000)/10)+'%';
 const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const refOf = f => `${f.id}·v${f.version}`;
 const wait = ms => new Promise(r=>setTimeout(r,matchMedia('(prefers-reduced-motion: reduce)').matches?0:ms));
+const fits = f => f.dataset===TASK.dataset && f.model==='ResNet-50' && f.image===TASK.image;
 
-/* ---------- Atlas activity (what the command listener would capture) ---------- */
+/* ---------- Atlas activity ---------- */
 function log(op,coll,detail,o={}){
   S.events.push({t:tick(o.dt??.4),op,coll,detail,ms:o.ms??null,docs:o.docs??null,shape:o.shape||null,change:!!o.change,fresh:true});
   renderStrip();
@@ -268,199 +309,238 @@ function renderStrip(){
   S.events.forEach(e=>e.fresh=false); el.scrollTop=el.scrollHeight;
 }
 
-/* ---------- actions ---------- */
-async function runAgentA(animate){
-  S.findings={};S.order=[];S.search=null;S.decision=null;
+/* ---------- terminal ---------- */
+const say = (cls,text) => S.term.push({cls,text});
+async function stream(lines,ms=380){ for(const [c,t] of lines){ say(c,t); renderTerm(); await wait(ms); } }
+function renderTerm(){ const b=document.getElementById('tbody'); if(!b) return; b.innerHTML=termLines(); b.scrollTop=b.scrollHeight; }
+const termLines = () => S.term.map(l=>`<div class="${l.cls}">${l.text}</div>`).join('') || '<div class="tool" style="padding-left:0">Claude Code is connected to Precedent through MCP. Type a request below.</div>';
+function terminal(input){
+  return `<div class="term" role="region" aria-label="Embedded terminal"><div class="bar-t"><i></i><i></i><i></i><span>claude · ~/vision-research · MCP: precedent</span></div>
+    <div class="body" id="tbody">${termLines()}</div>
+    ${input?`<form class="inrow" id="tform"><b>›</b><input id="tin" value="${esc(input.value)}" aria-label="Message to Claude Code" ${S.busy?'disabled':''}><button type="submit" ${S.busy?'disabled':''}>${input.send||'Send'}</button>${input.no?`<button type="button" class="no" data-act="${input.no.act}" ${S.busy?'disabled':''}>${input.no.label}</button>`:''}</form>`:''}</div>`;
+}
+
+/* ---------- platform actions (what the MCP tools do) ---------- */
+async function runAgents(animate){
+  S.findings={};S.order=[];
   for(const s of SEED){
-    if(animate){await wait(500)}
-    const f={...s,version:1,status:'current',published:tick(.6),history:[],expires:'2026-11-15 00:00 UTC'};
-    f.history.push({v:1,at:f.published,actor:'agent-a',action:'published'});
+    if(animate) await wait(400);
+    const f={...s,version:1,status:'current',published:tick(.6),history:[]};
+    f.history.push({v:1,at:f.published,actor:f.agent,action:'published'});
     S.findings[s.key]=f;S.order.push(s.key);
-    log('insert','results',`${f.title}`,{ms:9+(S.order.length*2),docs:1,shape:{insert:'results',documents:[{_id:f.id,project_id:'team-run-01',version:1,job:f.job,conditions:{cohort:f.cohort},execution:f.exec,direction:f.dir}]}});
-    if(f.exec==='completed') log('insert','result_vectors',`search vector for ${f.id}`,{ms:7,docs:1,dt:.1});
-    chg('results',`new finding shown on screen`);
+    log('insert','results',`${f.agent}: ${f.title}`,{ms:9+S.order.length*2,docs:1,shape:{insert:'results',documents:[{_id:f.id,project_id:'vision-research',author:f.agent,version:1,conditions:{dataset:f.dataset,model:f.model,image:f.image},settings:f.settings,execution:f.exec,direction:f.dir,weights:f.weights?f.weights.file:null}]}});
+    if(f.weights) log('GridFS upload','fs.chunks',`${f.weights.file} · ${f.weights.size}`,{ms:420+S.order.length*30,docs:392,dt:.2});
+    if(f.exec==='completed'&&!f.background) log('insert','result_vectors',`search vector for ${f.id}`,{ms:7,docs:1,dt:.1});
+    chg('results','new experiment shown on screen');
     if(animate) render();
   }
 }
-function doSearch(){
+function search(){
   const hits=[],dropped=[];
   for(const k of S.order){const f=S.findings[k];
-    if(f.exec!=='completed') continue;
-    if(k==='promising'&&f.version===2){dropped.push({f,why:'old version (now corrected)'});hits.push({f,score:CORRECTION.score});continue}
+    if(f.exec!=='completed'||f.background||f.mine) continue;
+    if(k==='ckpt'&&f.version===2){dropped.push({f,why:'old version, now corrected'});hits.push(f);continue}
     if(f.status==='expired'){dropped.push({f,why:'expired'});continue}
-    hits.push({f,score:f.score});}
-  hits.sort((a,b)=>b.score-a.score);
-  const cands=hits.map(h=>({...h,applies:h.f.cohort==='A'}));
-  const ms=34+Math.round(Math.random()*10);
-  log('aggregate','result_vectors',`$vectorSearch in team-run-01 + live-record check · ${cands.length} kept${dropped.length?`, ${dropped.length} dropped`:''}`,{ms,docs:cands.length,shape:PIPE});
-  S.search={cands,dropped,ms};
+    hits.push(f);}
+  log('aggregate','result_vectors',`MCP search_experiments → $vectorSearch in vision-research + live-record check · ${hits.length} kept${dropped.length?`, ${dropped.length} dropped`:''}`,{ms:36+Math.round(Math.random()*8),docs:hits.length,shape:PIPE});
+  const use=hits.filter(f=>fits(f)&&f.dir==='positive'&&f.weights), avoid=hits.filter(f=>fits(f)&&f.dir==='negative'), nofit=hits.filter(f=>!fits(f));
+  return {use,avoid,nofit,dropped};
 }
-function decide(){
-  const d={id:'d-'+(++S.n),memory:S.memory,status:'pending',used:[],skipped:[],rejected:[],cands:[],gov:gov()};
-  if(S.memory==='off'){d.job='plain-l1';d.reason='Memory is off, so there is nothing to learn from. Play it safe.'}
-  else{
-    if(!S.search)doSearch(); d.cands=S.search.cands;
-    const app=d.cands.filter(c=>c.applies), posA=app.find(c=>c.f.dir==='positive'&&c.f.family==='A'), negB=app.find(c=>c.f.dir==='negative'&&c.f.family==='B');
-    d.rejected=d.cands.filter(c=>!c.applies).map(c=>c.f);
-    if(posA){d.job='dict-a-l6';d.used=[posA.f,...(negB?[negB.f]:[])];d.reason='Dictionary A already worked on cohort A, so try it at a stronger setting.'+(negB?' Skip dictionary B: it failed here before.':'')}
-    else{d.job='plain-l1';d.used=negB?[negB.f]:[];d.reason=(gov().corrected?'Dictionary A turned out to be tested on cohort B, so there is no proof it helps here.':'No evidence that a dictionary helps here.')+(negB?' Dictionary B failed here before.':' Nothing says dictionary B failed anymore, but nothing says it works either.')+' Play it safe.'}
-  }
-  tick(1.2);
-  log('insert','decisions',`recommendation ${d.id}: ${d.job} · waiting for approval`,{ms:8,docs:1,shape:{insert:'decisions',documents:[{_id:d.id,status:'pending',job_id:d.job,used_refs:d.used.map(f=>({result_id:f.id,version:f.version}))}]}});
+function propose(ctx){
+  const d={id:'d-'+(++S.n),status:'pending',ctx,gov:gov()};
+  d.job=ctx.use.length?'warm-start':'scratch';
+  d.used=[...ctx.use,...ctx.avoid];
+  tick(1);
+  log('insert','decisions',`plan ${d.id}: ${JOBS[d.job].label} · waiting for you`,{ms:8,docs:1,shape:{insert:'decisions',documents:[{_id:d.id,status:'pending',job:d.job,used_refs:d.used.map(f=>({result_id:f.id,version:f.version}))}]}});
+  log('update','decisions',`context: ${ctx.use.length} used, ${ctx.avoid.length} avoided, ${ctx.nofit.length} set aside`,{ms:5,docs:1,dt:.1});
+  chg('decisions','experiments highlighted on screen');
   S.decision=d;return d;
 }
-function approve(d){
-  const ok=d.status==='pending';
-  log('findOneAndUpdate','decisions',`approve ${d.id} only if still pending · ${ok?'matched 1':'matched 0 → refused'}`,{ms:6,docs:ok?1:0,shape:{findAndModify:'decisions',query:{_id:d.id,status:'pending'},update:{$set:{status:'approved',decided_by:'researcher'}}}});
-  if(ok){d.status='approved'} else S.toast='Refused: this recommendation was already '+d.status+'. It can only be approved once.';
+const gov = () => ({corrected:S.findings.ckpt?.version===2,expired:S.findings.fastlr?.status==='expired'});
+function labelFor(d){return d.gov.corrected&&d.gov.expired?'After correction + expiry':d.gov.corrected?'After correction':d.gov.expired?'After expiry':'With Precedent'}
+
+async function askClaude(text){
+  S.busy=true; say('you',esc(text)); render(); await wait(300);
+  S.context=search(); const c=S.context;
+  await stream([['cl','precedent.search_experiments("ResNet-50 ImageNet, 75% target, 8 GPU-hours")'],
+    ['tool',`${c.use.length+c.avoid.length+c.nofit.length} experiments returned${c.dropped.length?` · ${c.dropped.length} left out (${c.dropped.map(x=>x.why).join(', ')})`:''} · crashed runs never returned`]]);
+  const d=propose(c); render();
+  const lines=[];
+  c.use.forEach(f=>lines.push(['cl',`Using <span class="good">${f.id}</span> “${esc(f.title)}”. Weights: ${f.weights.src}.`]));
+  c.avoid.forEach(f=>lines.push(['cl',`Avoiding <span class="badv">${f.id}</span>: ${esc(f.title).toLowerCase()}.`]));
+  c.nofit.forEach(f=>lines.push(['cl',`Setting aside ${f.id}: ${f.version>1?'now recorded as 100-class weights':'trained on '+esc(f.dataset.split(' (')[0])+', '+f.image+' images'}, doesn’t fit this task.`]));
+  if(!c.use.length&&!c.avoid.length&&!c.nofit.length) lines.push(['cl','No past experiments fit this task.']);
+  lines.push(['cl',d.job==='warm-start'?'Suggestion: retrain from those weights, last layers only, learning rate 0.001. Want me to run it?':'No usable weights fit this task. Suggestion: train from scratch with warmup. Want me to run it?']);
+  await stream(lines,420);
+  S.busy=false; S.pending='decide'; render();
 }
-function reject(d){if(d.status!=='pending')return;log('findOneAndUpdate','decisions',`reject ${d.id} · matched 1`,{ms:6,docs:1});d.status='rejected'}
-function execute(d){
-  if(d.status!=='approved'){S.toast='Nothing runs without approval.';return}
-  if(d.used.length) log('find','results',`re-check ${d.used.length} cited finding${d.used.length>1?'s':''} are still current`,{ms:5,docs:d.used.length});
-  const j=JOBS[d.job];
-  const r={id:'r-'+d.id,d,job:d.job,out:j.out,ratio:j.out/IN,label:labelFor(d),cited:d.used.map(refOf)};
-  log('update','decisions',`result saved: ${d.job} → ${j.out}/${IN} bytes`,{ms:7,docs:1});
-  chg('decisions','result shown on screen');
+async function runPlan(text){
+  const d=S.decision; if(!d||d.status!=='pending') return;
+  S.busy=true; say('you',esc(text)); render(); await wait(250);
+  log('findOneAndUpdate','decisions',`approve ${d.id} only if still pending · matched 1`,{ms:6,docs:1,shape:{findAndModify:'decisions',query:{_id:d.id,status:'pending'},update:{$set:{status:'approved',decided_by:'you'}}}});
+  d.status='approved';
+  const j=JOBS[d.job], lines=[];
+  if(d.used.length) log('find','results',`resolve: ${d.used.length} cited experiment${d.used.length>1?'s':''} still current`,{ms:5,docs:d.used.length});
+  if(d.job==='warm-start'){
+    log('GridFS download','fs.chunks','MCP load_weights → resnet50_in1k_v1.pt · 98 MB',{ms:860,docs:392});
+    lines.push(['cl','precedent.load_weights("7f3a9c12")'],['tool','resnet50_in1k_v1.pt · 98 MB · sha256 verified'],
+      ['cl','python train.py --init weights/resnet50_in1k_v1.pt --freeze backbone --lr 0.001 --budget-hours 8'],
+      ['out','epoch 1/1 · loss 1.02 · val accuracy 74.9%'],['out','fine-tune last block · val accuracy <span class="good">76.3%</span> · 0.6 GPU-hours']);
+  } else {
+    lines.push(['cl','python train.py --init random --lr 0.1 --warmup 5 --budget-hours 8'],['out','epoch 1/90 · val accuracy 8.2%'],['out','epoch 4/90 · budget used up · val accuracy <span class="badv">41.0%</span> · 8 GPU-hours']);
+  }
+  await stream(lines,520);
+  const r={id:'r-'+d.id,d,job:d.job,acc:j.acc,gpu:j.gpu,label:labelFor(d),cited:d.used.map(refOf)};
   d.status='executed';d.receipt=r;S.receipts=S.receipts.filter(x=>x.label!==r.label);S.receipts.push(r);
+  const nf={key:'mine'+S.n,id:Math.random().toString(16).slice(2,10),agent:'you + Claude Code',team:'Your session',title:`${j.label}: ${pct(j.acc)} (${r.label.toLowerCase()})`,dataset:TASK.dataset,model:'ResNet-50',image:'224 px',
+    settings:d.job==='warm-start'?'from 7f3a9c12 weights · last layers · lr 0.001':'random init · lr 0.1 · warmup 5',acc:j.acc,gpu:j.gpu+' GPU-hours',dir:j.acc>=TARGET?'positive':'negative',exec:'completed',mine:true,version:1,status:'current',published:now(),history:[{v:1,at:now(),actor:'you + Claude Code',action:'published'}]};
+  S.findings[nf.key]=nf;S.order.push(nf.key);S.lastNew=nf.key;
+  log('insert','results',`MCP publish_result → ${nf.title}`,{ms:10,docs:1});
+  chg('results','new experiment shown on screen');
+  await stream([['cl','precedent.publish_result(...)'],['tool',`saved as ${nf.id}, cites ${r.cited.join(', ')||'nothing'}`]],350);
+  S.busy=false; S.pending=null; render();
 }
-const gov = () => ({corrected:S.findings.promising?.version===2,expired:S.findings.failed?.status==='expired'});
-function labelFor(d){if(d.memory==='off')return 'Memory off';return d.gov.corrected&&d.gov.expired?'After correction + expiry':d.gov.corrected?'After correction':d.gov.expired?'After expiry':'Memory on'}
+async function notNow(){
+  const d=S.decision; if(!d||d.status!=='pending') return;
+  say('you','Not now.');
+  log('findOneAndUpdate','decisions',`reject ${d.id} · matched 1 · nothing runs`,{ms:6,docs:1});
+  d.status='rejected'; say('cl','Okay. Nothing was run. The plan is saved as rejected.'); S.pending=null; render();
+}
 function correct(reason){
-  const f=S.findings.promising; if(f.version!==1) return;
-  log('transaction','results',`correct ${f.id}: keep v1 in history, make v2 current`,{ms:21,docs:3,shape:{transaction:[{insert:'result_versions',doc:{result_id:f.id,version:1}},{update:'results',q:{_id:f.id,version:1},u:{$set:{version:2,'conditions.cohort':'B',direction:'negative'}}},{insert:'result_vectors',doc:{result_id:f.id,version:2}}]}});
+  const f=S.findings.ckpt; if(f.version!==1) return;
+  log('transaction','results',`correct ${f.id}: keep v1 in history, make v2 current`,{ms:21,docs:3,shape:{transaction:[{insert:'result_versions',doc:{result_id:f.id,version:1}},{update:'results',q:{_id:f.id,version:1},u:{$set:{version:2,'conditions.dataset':CORRECTION.dataset}}},{insert:'result_vectors',doc:{result_id:f.id,version:2}}]}});
   chg('results','correction shown on screen');
-  f.history.push({v:2,at:now(),actor:'researcher',action:'corrected',reason,prev:{title:f.title,cohort:f.cohort,out:f.out}});
-  Object.assign(f,{version:2,title:CORRECTION.title,cohort:'B',out:760,dir:'negative'});S.search=null;
+  f.history.push({v:2,at:now(),actor:'researcher',action:'corrected',reason,prev:{title:f.title,dataset:f.dataset}});
+  Object.assign(f,{version:2,title:CORRECTION.title,dataset:CORRECTION.dataset});
 }
 function expire(key,reason){
-  const f=S.findings[key]; if(f.status!=='current') return;
+  const f=S.findings[key]; if(!f||f.status!=='current') return;
   f.expiredAt=tick(1);
-  log('update','results',`expire ${f.id}: expires_at = now`,{ms:6,docs:1,shape:{update:'results',q:{_id:f.id,project_id:'team-run-01'},u:{$set:{expires_at:'$$NOW'}}}});
+  log('update','results',`expire ${f.id}: expires_at = now`,{ms:6,docs:1,shape:{update:'results',q:{_id:f.id,project_id:'vision-research'},u:{$set:{expires_at:'$$NOW'}}}});
   chg('results','expiry shown on screen');
-  f.status='expired';f.history.push({v:f.version,at:f.expiredAt,actor:'researcher',action:'expired',reason});S.search=null;
+  f.status='expired';f.history.push({v:f.version,at:f.expiredAt,actor:'researcher',action:'expired',reason});
 }
-const PIPE=[{$vectorSearch:{index:'research_memory_v1',path:'embedding',queryVector:'[1536 floats]',filter:{project_id:'team-run-01'},limit:12}},{$lookup:{from:'results',as:'live',pipeline:[{$match:{same_version:true,expires_at:{$gt:'$$NOW'},execution:'completed'}}]}},{$unwind:'$live'},{$addFields:{applies:'cohort, codec, dictionary, fixture match the task'}}];
+const PIPE=[{$vectorSearch:{index:'research_memory_v1',path:'embedding',queryVector:'[1536 floats]',filter:{project_id:'vision-research'},limit:12}},{$lookup:{from:'results',as:'live',pipeline:[{$match:{same_version:true,expires_at:{$gt:'$$NOW'},execution:'completed'}}]}},{$unwind:'$live'},{$addFields:{fits:'dataset, model and image size match the task'}}];
 
-/* ---------- small UI pieces ---------- */
+/* ---------- UI pieces ---------- */
 function label(f){
   if(f.exec!=='completed') return '<span class="chip c-bad">Crashed, not evidence</span>';
   return (f.dir==='positive'?'<span class="chip c-pos">Worked</span>':'<span class="chip c-neg">Didn’t work</span>')+(f.status==='expired'?' <span class="chip c-bad">Expired</span>':f.version>1?' <span class="chip c-b">Corrected</span>':'');
 }
-function bar(x,lg){if(x==null)return `<div class="bar${lg?' lg':''}"><s></s></div>`;return `<div class="bar${lg?' lg':''}" role="img" aria-label="${pct(x)} of original size; target 40%"><i style="width:${Math.min(100,x*100)}%;--fill:var(${x<=THR?'--pos':'--neg'})"></i><s></s></div>`}
-const legend=()=>`<div class="legend"><span>0%</span><span class="thr">target 40%</span><span>100%</span></div>`;
-const ref=f=>`<button class="ref" data-f="${f.key}">${refOf(f)}</button>`;
+function bar(x,lg){if(x==null)return `<div class="bar${lg?' lg':''}"><s></s></div>`;return `<div class="bar${lg?' lg':''}" role="img" aria-label="${pct(x)} accuracy; target 75%"><i style="width:${Math.min(100,x*100)}%;--fill:var(${x>=TARGET?'--pos':'--neg'})"></i><s></s></div>`}
+const legend=()=>`<div class="legend"><span>0%</span><span class="thr">target 75%</span><span>100%</span></div>`;
 const mongo=t=>`<div class="mongo"><span class="leaf"><svg viewBox="0 0 16 16"><path d="M8 1c2.6 3 3.6 5.6 3.6 7.7 0 2.6-1.6 4.4-3.6 5.3-2-.9-3.6-2.7-3.6-5.3C4.4 6.6 5.4 4 8 1Z" fill="#5FD39A"/><path d="M8 4v11" stroke="#0D3A2C" stroke-width="1.1"/></svg></span><div><span class="t">In MongoDB</span><p>${t}</p></div></div>`;
 function hl(o){return esc(JSON.stringify(o,null,2)).replace(/(&quot;[^&]*?&quot;)(\s*:)/g,'<span class="k">$1</span>$2').replace(/:\s(&quot;.*?&quot;)/g,': <span class="s">$1</span>').replace(/:\s(-?\d+\.?\d*|true|false|null)/g,': <span class="n">$1</span>')}
+const resultText=f=>f.acc!=null?pct(f.acc)+' accuracy':(f.accText||'No measurement');
+function role(f){
+  const c=S.context; if(!c) return '';
+  if(c.use.includes(f)) return 'use'; if(c.avoid.includes(f)) return 'avoid'; if(c.nofit.includes(f)) return 'nofit'; return '';
+}
+const roleChip={use:'<span class="chip c-g">Claude Code is using this</span>',avoid:'<span class="chip c-neg">Avoiding</span>',nofit:'<span class="chip c-off">Doesn’t fit</span>'};
+function xlist(showAll){
+  const fs=S.order.map(k=>S.findings[k]).filter(f=>showAll||!f.background);
+  return `<div class="xlist">${fs.map(f=>{const r=role(f);return `<button class="xrow ${r}${f.key===S.lastNew?' new':''}" data-f="${f.key}"><span class="t">${esc(f.title)}<small>${esc(f.agent)} · ${resultText(f)}</small></span>${r?roleChip[r]:f.key===S.lastNew?'<span class="chip c-b">New</span>':label(f)}</button>`}).join('')}</div>`;
+}
 
 /* ---------- Demo stages ---------- */
-function done(){const g=gov(),L=S.receipts.map(r=>r.label);return [S.order.length===4,!!S.search,!!S.decision,!!S.decision&&S.decision.status!=='pending',L.includes('Memory on'),g.corrected&&g.expired,L.length>=4]}
+function done(){const g=gov(),L=S.receipts.map(r=>r.label);return [true,!!S.context,!!S.decision&&S.decision.status!=='pending',L.includes('With Precedent'),g.corrected&&g.expired,L.length>=4]}
 function demoPage(){
   const dn=done();
   return `<div class="stepper">${STAGES.map((s,i)=>`<button data-stage="${i+1}" class="${dn[i]?'done':''}" ${S.stage===i+1?'aria-current="step"':''} aria-label="Stage ${i+1}: ${s}"><span class="dotn">${dn[i]&&S.stage!==i+1?'✓':i+1}</span><span class="lbl">${s}</span></button>`).join('')}</div>
-  <div><div class="eyebrow">Stage ${S.stage} of 7</div><h1>${STAGES[S.stage-1]}</h1></div>
-  ${[st1,st2,st3,st4,st5,st6,st7][S.stage-1]()}
+  <div><div class="eyebrow">Stage ${S.stage} of ${STAGES.length}</div><h1>${STAGES[S.stage-1]}</h1></div>
+  ${[st1,st2,st3,st4,st5,st6][S.stage-1]()}
   ${S.toast?`<div class="toast" role="status">${esc(S.toast)}</div>`:''}
-  <div class="stagebar">${S.stage>1?'<button class="btn ghost" data-act="prev">Back</button>':''}${S.stage<7?'<button class="btn" data-act="next">Next</button>':''}</div>`;
+  <div class="stagebar">${S.stage>1?'<button class="btn ghost" data-act="prev">Back</button>':''}${S.stage<STAGES.length?'<button class="btn" data-act="next">Next</button>':''}</div>`;
 }
-const st1=()=>`<p class="lede">Agent A tested four ways to make short messages smaller. It saves every result, including the failure and the crash.</p>
-  <div class="fcards">${S.order.map(k=>S.findings[k]).map(f=>`<button class="fcard" data-f="${f.key}"><span class="t">${esc(f.title)}</span><span class="chips">${label(f)}</span>${bar(ratio(f))}<span class="s">${f.out!=null?pct(ratio(f))+' of original size':'No measurement'}</span></button>`).join('')}</div>
-  <div class="row"><button class="link" data-act="runA">Replay Agent A</button></div>
-  ${mongo('Each result is saved as one document and appears here instantly through a <b>change stream</b>. The crash is saved too, but never offered to agents as evidence.')}`;
+const st1=()=>`<p class="lede">Before running anything, see what other agents already tried: what worked, what failed, and which model weights are stored.</p>
+  <div class="fcards">${S.order.map(k=>S.findings[k]).filter(f=>!f.mine).map(f=>`<button class="fcard" data-f="${f.key}"><span class="t">${esc(f.title)}</span><span class="chips">${label(f)}${f.weights?' <span class="chip c-g">Weights stored</span>':''}${f.background?' <span class="chip c-line">From the paper</span>':''}</span>${f.acc!=null?bar(f.acc):''}<span class="s">${resultText(f)}</span><span class="s">${esc(f.agent)} · ${esc(f.team)}</span></button>`).join('')}</div>
+  ${mongo('Each experiment is one document, and its model weights are stored next to it with <b>GridFS</b>. New experiments appear instantly through a <b>change stream</b>. The crash is kept, but never offered as evidence.')}`;
 function st2(){
-  const s=S.search;
-  if(S.memory==='off') return `<p class="lede">Memory is turned off in Settings, so Agent B starts with nothing.</p>`;
-  return `<p class="lede">A brand-new Agent B gets the same goal in its own words. It has never seen Agent A’s notes.</p>
-  <div class="card"><div class="agent" style="margin-bottom:10px"><span class="av b">B</span><b>Agent B asks</b></div><p class="quote">“${REQUEST}”</p></div>
-  ${s?`<div class="found">${s.cands.map(c=>`<button class="frow" data-f="${c.f.key}"><span class="t">${esc(c.f.title)}</span>${label(c.f)}</button>`).join('')}
-    ${s.dropped.map(c=>`<div class="frow drop"><span class="t">${esc(c.f.title)}</span><span class="chip c-bad">Dropped: ${c.why}</span></div>`).join('')}</div>`:'<p class="muted">Searching…</p>'}
-  ${mongo(`<b>Atlas Vector Search</b> found Agent A’s work by meaning, inside this project only, in ${s?s.ms:'~40'} ms. The same query checked every result is still current${s&&s.dropped.length?' and dropped the ones that aren’t':''}.`)}`;
+  return `<p class="lede">Open Claude Code in the embedded terminal and ask it to build on past work. The experiments it picks light up on the left.</p>
+  <div class="split">${xlist(false)}${terminal(S.context?null:{value:PROMPT1})}</div>
+  ${mongo(S.context?'Claude Code called the <b>search_experiments</b> tool. One Atlas query searched by meaning inside this project, checked each result is still current, and marked what fits. Its picks were saved and pushed here through a <b>change stream</b>.':'Claude Code talks to Precedent through MCP tools. Every tool call is a governed query in Atlas.')}`;
 }
 function st3(){
-  const d=S.decision; if(!d) return '<p class="muted">Thinking…</p>';
-  const col=(t,c,list,why)=>`<div class="group"><h4 style="color:${c}">${t}</h4>${list.map(x=>`<button class="ev" data-f="${x.f.key}"><span class="t">${esc(x.f.title)}</span><span class="r">${why(x)}</span></button>`).join('')||'<span class="muted" style="font-size:13px">None</span>'}</div>`;
-  return `<p class="lede">MongoDB marks which results apply to this task. Agent B uses them to pick one job.</p>
-  ${d.memory==='on'?`<div class="grid3">
-    ${col('Applies and worked','var(--pos)',d.cands.filter(c=>c.applies&&c.f.dir==='positive'),c=>pct(ratio(c.f))+' of original size')}
-    ${col('Applies and failed','var(--neg)',d.cands.filter(c=>c.applies&&c.f.dir==='negative'),()=>'Missed the 40% target')}
-    ${col('Doesn’t apply','var(--bad)',d.cands.filter(c=>!c.applies),c=>'Tested on cohort '+c.f.cohort+', not A')}</div>`:''}
-  <div class="card"><div class="rec"><div class="job"><b>${d.job}</b><small>${JOBS[d.job].desc}</small></div>
-    <div class="why"><p>${esc(d.reason)}</p><p class="muted" style="font-size:13px">Based on: ${d.used.map(ref).join(' ')||'no evidence'}</p></div></div></div>
-  ${mongo(d.memory==='on'?'The match against the task’s conditions happened <b>inside the same search query</b>, so the cohort B result arrived already marked “doesn’t apply”.':'No search ran. The recommendation is saved and waits for approval.')}`;
+  const d=S.decision;
+  if(!d) return '<p class="lede">Ask Claude Code at stage 2 first.</p>';
+  const inp=d.status==='pending'&&S.pending==='decide'?{value:d.job==='warm-start'?'Yes. Retrain from those weights, last layers only, stop at 8 GPU-hours.':'Yes, train from scratch with warmup, stop at 8 GPU-hours.',send:'Run it',no:{act:'notnow',label:'Not now'}}:null;
+  return `<p class="lede">You stay in charge. Tell Claude Code what to run, change the plan, or say no. Nothing runs until you do.</p>
+  <div class="split">${xlist(false)}${terminal(inp)}</div>
+  ${d.status==='rejected'?'<div class="row"><span class="status no">Not run. The plan is saved as rejected.</span><button class="btn ghost" data-act="askagain">Ask again</button></div>':''}
+  ${mongo(d.status==='pending'?'Claude Code’s plan is saved as <b>pending</b>. Your answer becomes one <b>atomic update</b>, so a plan can only be approved once.':d.status==='rejected'?'The plan was marked rejected. Training only starts for approved plans.':'Approved exactly once, by you. The run cites the exact experiment versions it used.')}`;
 }
 function st4(){
-  const d=S.decision; if(!d) return '<p class="muted">Go back to stage 3 first.</p>';
-  return `<p class="lede">A person checks the recommendation. Nothing runs until they approve it.</p>
-  <div class="card"><div class="rec"><div class="job"><b>${d.job}</b><small>${JOBS[d.job].desc}</small></div><div class="why"><p>${esc(d.reason)}</p></div></div>
-    <div class="row" style="margin-top:16px">${d.status==='pending'?'<button class="btn" data-act="approve">Approve</button><button class="btn danger" data-act="reject">Reject</button>'
-      :d.status==='rejected'?'<span class="status no">Rejected. Nothing ran.</span><button class="btn ghost" data-act="again">Ask Agent B again</button>'
-      :'<span class="status ok">Approved</span><button class="link" data-act="approveAgain">Try approving twice</button>'}</div></div>
-  ${mongo(d.status==='pending'?'Approving is a single <b>atomic update</b> that only works while the recommendation is still waiting.':d.status==='rejected'?'Rejected and saved. The runner only runs approved recommendations, so nothing happened.':'Approved exactly once. A second approval finds nothing waiting and is refused.')}`;
+  const d=S.decision, r=d&&d.receipt;
+  if(!r) return `<p class="lede">${d&&d.status==='rejected'?'You said not now, so nothing trained.':'Tell Claude Code to run the plan at stage 3.'}</p><div class="split">${xlist(false)}${terminal(null)}</div>`;
+  return `<p class="lede">Claude Code loaded the stored weights and retrained. The new result was saved back as an experiment the next person can build on.</p>
+  <div class="grid2">
+    <div class="card" style="background:var(--code-bg);color:var(--code-fg);border-color:var(--code-bg)"><div class="eyebrow" style="color:var(--code-c)">Claude Code on its own · no Precedent</div>
+      <pre style="margin:10px 0 0;font:12.5px/1.7 var(--f-mono);white-space:pre-wrap">$ claude "train a ResNet-50 to 75% on ImageNet,
+         8 GPU-hours"
+› No past experiments to build on.
+› Starting from random weights.
+› epoch 4 of 90 … budget used up
+› accuracy: <span style="color:#F2A27C">${pct(BASELINE.acc)}</span>   GPU-hours: ${BASELINE.gpu}</pre></div>
+    <div class="card" style="border-color:var(--green)"><div class="eyebrow" style="color:var(--green)">Claude Code with Precedent</div>
+      <div class="big" style="margin-top:10px;color:var(${r.acc>=TARGET?'--pos':'--neg'})">${pct(r.acc)}</div><p class="muted">accuracy · ${r.gpu} GPU-hours used</p>
+      ${r.job==='warm-start'?`<p style="margin-top:10px"><span class="chip c-g">${(BASELINE.gpu-r.gpu).toFixed(1)} GPU-hours saved</span> <span class="chip c-g">reached the 75% target</span></p>`:''}</div>
+  </div>
+  ${xlist(false)}
+  ${mongo(r.job==='warm-start'?'<b>load_weights</b> streamed the 98 MB checkpoint from <b>GridFS</b> after re-checking it was still current. <b>publish_result</b> saved the new experiment, and it appeared here through a change stream.':'The new experiment was saved and appeared here through a change stream.')}`;
 }
 function st5(){
-  const d=S.decision, r=d&&d.receipt, base=S.receipts.find(x=>x.label==='Memory off');
-  if(!d||d.status==='pending'||d.status==='rejected') return `<p class="lede">${d&&d.status==='rejected'?'The recommendation was rejected, so nothing runs.':'Waiting for approval at stage 4.'}</p>`;
-  if(!r) return `<p class="lede">The approved job runs on 8 messages Agent A never saw.</p><div class="row"><button class="btn" data-act="execute">Run the approved job</button></div>
-    ${mongo('Just before running, the cited results are re-read to make sure nobody corrected or expired them in the meantime.')}`;
-  return `<p class="lede">The approved job ran on 8 messages Agent A never saw.</p>
-  <div class="card"><div class="row" style="justify-content:space-between;margin-bottom:14px"><div><div class="big" style="color:var(${r.ratio<=THR?'--pos':'--neg'})">${pct(r.ratio)}</div><p class="muted">of original size with ${r.job}</p></div>
-    ${base?`<div style="text-align:right"><div class="big">${(base.out/r.out).toFixed(1)}×</div><p class="muted">smaller than without memory</p></div>`:''}</div>
-    <div class="compare"><div class="crow"><span class="lbl">With memory<small>${r.job}</small></span>${bar(r.ratio,true)}<span class="v">${pct(r.ratio)}</span></div>
-    ${base?`<div class="crow"><span class="lbl">Without memory<small>${base.job}</small></span>${bar(base.ratio,true)}<span class="v">${pct(base.ratio)}</span></div>`:''}</div>${legend()}</div>
-  ${mongo('The cited results were re-checked right before running, and the result was saved and streamed to this screen.')}`;
+  const p=S.findings.ckpt,f=S.findings.fastlr,g=gov(),d=S.decision;
+  const fresh=d&&d.status!=='executed'&&d.gov.corrected===g.corrected&&d.gov.expired===g.expired;
+  const ran=S.receipts.find(r=>r.d&&r.d.gov.corrected===g.corrected&&r.d.gov.expired===g.expired);
+  let inp=null;
+  if((g.corrected||g.expired)&&!S.busy){
+    if(!fresh&&!ran) inp={value:'Same task again, with the updated memory.',send:'Send'};
+    else if(fresh&&d.status==='pending'&&S.pending==='decide') inp={value:'Yes, run it.',send:'Run it',no:{act:'notnow',label:'Not now'}};
+  }
+  return `<p class="lede">A researcher fixes one experiment and retires another. Then you ask Claude Code again.</p>
+  <div class="grid2">
+    <div class="card"><div class="eyebrow">1 · Correct</div><h2 style="margin:6px 0">${esc(p.title)}</h2>
+      <p class="muted" style="font-size:14px">${g.corrected?'Corrected: the linked weights only know 100 classes.':'A reviewer finds the linked weights were a 100-class fine-tune.'}</p>
+      <div style="margin-top:12px">${g.corrected?'<span class="chip c-b">Corrected</span> <button class="link" data-f="ckpt">See old and new</button>':'<button class="btn" data-act="correct">Correct it</button>'}</div></div>
+    <div class="card"><div class="eyebrow">2 · Expire</div><h2 style="margin:6px 0">${esc(f.title)}</h2>
+      <p class="muted" style="font-size:14px">It came from an old library version that has since been fixed.</p>
+      <div style="margin-top:12px">${g.expired?'<span class="chip c-bad">Expired</span> <button class="link" data-f="fastlr">See history</button>':`<button class="btn danger" data-act="expire" ${g.corrected&&ran?'':'disabled title="Correct first and rerun, so each change shows on its own"'}>Expire it</button>`}</div></div>
+  </div>
+  <div class="split">${xlist(false)}${terminal(inp)}</div>
+  ${mongo(g.expired?'Expiry took effect on the very next search. Atlas will delete the record later with a <b>TTL index</b>; nothing waits for that.':g.corrected?'The correction was one <b>transaction</b>: people can still read the old version, and Claude Code only gets the new one.':'Corrections and expiry change what Claude Code can use, starting with its next search.')}`;
 }
 function st6(){
-  const p=S.findings.promising,f=S.findings.failed,g=gov(),d=S.decision;
-  const pending=d&&d.status==='pending'&&(d.gov.corrected||d.gov.expired);
-  const last=S.receipts.filter(r=>r.label.startsWith('After')).slice(-1)[0];
-  return `<p class="lede">A person fixes one result and retires another. After each, Agent B asks the same question again.</p>
-  <div class="grid2">
-    <div class="card"><div class="eyebrow">1 · Correct</div><h2 style="margin:6px 0">${esc(g.corrected?CORRECTION.title:p.title)}</h2>
-      <p class="muted" style="font-size:14px">It was really tested on cohort B.</p>
-      <div style="margin-top:12px">${g.corrected?'<span class="chip c-b">Corrected</span> <button class="link" data-f="promising">See old and new</button>':'<button class="btn" data-act="correct">Correct it</button>'}</div></div>
-    <div class="card"><div class="eyebrow">2 · Expire</div><h2 style="margin:6px 0">${esc(f.title)}</h2>
-      <p class="muted" style="font-size:14px">This old result shouldn’t guide agents anymore.</p>
-      <div style="margin-top:12px">${g.expired?'<span class="chip c-bad">Expired</span> <button class="link" data-f="failed">See history</button>':`<button class="btn danger" data-act="expire" ${g.corrected?'':'disabled title="Correct first, so each change shows on its own"'}>Expire it</button>`}</div></div>
-  </div>
-  <div class="card"><div class="row"><div class="agent"><span class="av b">B</span><b>Agent B asks again</b></div><span style="flex:1"></span>
-    <button class="btn" data-act="rerun" ${(g.corrected||g.expired)&&!pending&&!(last&&last.d.gov.corrected===g.corrected&&last.d.gov.expired===g.expired)?'':'disabled'}>Re-run</button></div>
-    ${pending?`<div class="rec" style="margin-top:14px"><div class="job"><b>${d.job}</b><small>${JOBS[d.job].desc}</small></div><div class="why"><p>${esc(d.reason)}</p>
-      <div class="row"><button class="btn" data-act="approveRun">Approve and run</button><button class="btn danger" data-act="reject">Reject</button></div></div></div>`
-    :last?`<p style="margin-top:12px"><span class="chip c-g">${last.label}: ran ${last.job}, ${pct(last.ratio)}</span></p>`:''}
-  </div>
-  ${mongo(g.expired?'Expiry took effect on the very next search. Atlas will delete the record later with a <b>TTL index</b>, but nothing waits for that.':g.corrected?'The correction was one <b>transaction</b>: the old version is kept for people to read, and only the new one can be used by agents.':'Corrections and expiry change what every agent can use, starting with the next search.')}`;
-}
-function st7(){
-  const L=['Memory off','Memory on','After correction','After correction + expiry'], by=l=>S.receipts.find(r=>r.label===l);
-  return `<p class="lede">Same question, same choices, one try each. Only the memory changed.</p>
-  <div class="card"><div class="compare">${L.map(l=>{const r=by(l);return `<div class="crow"><span class="lbl">${l}<small>${r?r.job:'not run yet'}</small></span>${r?bar(r.ratio,true):'<div class="bar lg"><s></s></div>'}<span class="v" style="color:var(${r?(r.ratio<=THR?'--pos':'--neg'):'--muted'})">${r?pct(r.ratio):'—'}</span></div>`}).join('')}</div>${legend()}</div>
-  ${mongo('Every run records the exact result versions it read from Atlas, so you can trace each decision back to its evidence.')}`;
+  const L=['Claude Code on its own','With Precedent','After correction','After correction + expiry'], by=l=>l===BASELINE.label?BASELINE:S.receipts.find(r=>r.label===l);
+  return `<p class="lede">Same Claude Code, same task, same 8 GPU-hours. First on its own, then with Precedent as people corrected and expired what it knew.</p>
+  <div class="card"><div class="compare">${L.map(l=>{const r=by(l);return `<div class="crow"><span class="lbl">${l}<small>${r?(r.outside?'outside the platform':JOBS[r.job].label)+' · '+r.gpu+' GPU-h':'not run yet'}</small></span>${r?bar(r.acc,true):'<div class="bar lg"><s></s></div>'}<span class="v" style="color:var(${r?(r.acc>=TARGET?'--pos':'--neg'):'--muted'})">${r?pct(r.acc):'—'}</span></div>`}).join('')}</div>${legend()}</div>
+  ${mongo('Every run records the exact experiment versions and weights it read from Atlas, and was saved back as a new experiment.')}`;
 }
 
 /* ---------- other pages ---------- */
 function researchPage(){
-  const q=S.q.toLowerCase(), fs=S.order.map(k=>S.findings[k]).filter(f=>!q||(f.title+' cohort '+f.cohort).toLowerCase().includes(q));
-  return `<div><div class="eyebrow">Research</div><h1>All findings</h1></div>
-  <form class="search" id="rs" role="search"><input id="rq" value="${esc(S.q)}" placeholder="Search findings" aria-label="Search findings"><button class="btn ghost" type="submit">Search</button></form>
-  <div class="tbl"><table><thead><tr><th>Finding</th><th>Result</th><th>Cohort</th><th>Version</th><th>Status</th></tr></thead><tbody>
-  ${fs.map(f=>`<tr class="click" data-f="${f.key}"><td><b style="font-weight:600">${esc(f.title)}</b><div class="muted" style="font-size:12px">by agent-a</div></td><td>${label(f).split(' <')[0]}</td><td>${f.cohort}</td><td class="mono">v${f.version}</td><td>${f.status==='expired'?'<span class="chip c-bad">Expired</span>':'<span class="chip c-g">Current</span>'}</td></tr>`).join('')}
+  const q=S.q.toLowerCase(), fs=S.order.map(k=>S.findings[k]).filter(f=>!q||(f.title+' '+f.dataset+' '+f.agent+' '+f.team).toLowerCase().includes(q));
+  return `<div><div class="eyebrow">Research · vision-research</div><h1>All experiments</h1></div>
+  <form class="search" id="rs" role="search"><input id="rq" value="${esc(S.q)}" placeholder="Search experiments, agents or datasets" aria-label="Search experiments"><button class="btn ghost" type="submit">Search</button></form>
+  <div class="tbl"><table><thead><tr><th>Experiment</th><th>Result</th><th>Dataset</th><th>Weights</th><th>Status</th></tr></thead><tbody>
+  ${fs.map(f=>`<tr class="click" data-f="${f.key}"><td><b style="font-weight:600">${esc(f.title)}</b><div class="muted" style="font-size:12px">${esc(f.agent)} · ${esc(f.team)}</div></td><td>${label(f).split(' <')[0]}</td><td>${esc(f.dataset.split(' (')[0])}</td><td>${f.weights?'<span class="chip c-g">'+f.weights.size+'</span>':'—'}</td><td>${f.status==='expired'?'<span class="chip c-bad">Expired</span>':'<span class="chip c-g">Current</span>'}</td></tr>`).join('')}
   </tbody></table></div>`;
 }
 function govPage(){
-  return `<div><div class="eyebrow">Governance</div><h1>Review findings</h1></div>
-  <p class="lede">Correct a result if its evidence was wrong. Expire it if it shouldn’t guide agents anymore.</p>
-  <div class="tbl"><table><thead><tr><th>Finding</th><th>Status</th><th>Last change</th><th></th></tr></thead><tbody>
-  ${S.order.map(k=>S.findings[k]).map(f=>{const h=f.history[f.history.length-1];return `<tr class="click" data-f="${f.key}"><td>${esc(f.title)} <span class="mono muted">v${f.version}</span></td><td>${f.status==='expired'?'<span class="chip c-bad">Expired</span>':f.exec!=='completed'?'<span class="chip c-bad">Crashed</span>':'<span class="chip c-g">Current</span>'}</td><td class="muted" style="font-size:13px">${h.action} by ${h.actor}</td>
-    <td style="white-space:nowrap;text-align:right">${f.key==='promising'&&f.version===1?'<button class="btn ghost" data-act="correct">Correct</button> ':''}${f.status==='current'&&f.exec==='completed'?`<button class="btn danger" data-act="expireAny" data-k="${f.key}">Expire</button>`:''}</td></tr>`}).join('')}
+  return `<div><div class="eyebrow">Governance</div><h1>Review experiments</h1></div>
+  <p class="lede">Correct an experiment if its record was wrong. Expire it if it shouldn’t guide agents anymore.</p>
+  <div class="tbl"><table><thead><tr><th>Experiment</th><th>Status</th><th>Last change</th><th></th></tr></thead><tbody>
+  ${S.order.map(k=>S.findings[k]).map(f=>{const h=f.history[f.history.length-1];return `<tr class="click" data-f="${f.key}"><td>${esc(f.title)} <span class="mono muted">v${f.version}</span></td><td>${f.status==='expired'?'<span class="chip c-bad">Expired</span>':f.exec!=='completed'?'<span class="chip c-bad">Crashed</span>':'<span class="chip c-g">Current</span>'}</td><td class="muted" style="font-size:13px">${h.action} by ${esc(h.actor)}</td>
+    <td style="white-space:nowrap;text-align:right">${f.key==='ckpt'&&f.version===1?'<button class="btn ghost" data-act="correct">Correct</button> ':''}${f.status==='current'&&f.exec==='completed'?`<button class="btn danger" data-act="expireAny" data-k="${f.key}">Expire</button>`:''}</td></tr>`}).join('')}
   </tbody></table></div>`;
 }
 function settingsPage(){
+  const agents=[...new Set(SEED.map(s=>s.agent+' · '+s.team))];
   return `<div><div class="eyebrow">Settings</div><h1>Environment</h1></div>
   <div class="grid2">
-    <div class="card"><h2 style="margin-bottom:10px">MongoDB Atlas</h2><dl class="kv"><dt>status</dt><dd style="color:var(--pos)">connected</dd><dt>database</dt><dd>research_memory</dd><dt>vector index</dt><dd>research_memory_v1 · ready</dd><dt>change streams</dt><dd>on</dd><dt>cleanup</dt><dd>TTL index on purge_at</dd></dl></div>
-    <div class="card"><h2 style="margin-bottom:10px">Agent B memory</h2><div class="toggle" role="group" aria-label="Agent B memory"><button data-mem="on" aria-pressed="${S.memory==='on'}">On</button><button data-mem="off" aria-pressed="${S.memory==='off'}">Off</button></div>
-      <p class="muted" style="font-size:13px;margin-top:10px">Off records the baseline: Agent B skips search and plays it safe.</p></div>
-    <div class="card"><h2 style="margin-bottom:10px">Project</h2><dl class="kv"><dt>project</dt><dd>team-run-01</dd><dt>agents</dt><dd>agent-a, agent-b</dd><dt>human</dt><dd>researcher</dd></dl></div>
+    <div class="card"><h2 style="margin-bottom:10px">MongoDB Atlas</h2><dl class="kv"><dt>status</dt><dd style="color:var(--pos)">connected</dd><dt>database</dt><dd>research_memory</dd><dt>vector index</dt><dd>research_memory_v1 · ready</dd><dt>model weights</dt><dd>GridFS · 2 files · 192 MB</dd><dt>change streams</dt><dd>on</dd><dt>cleanup</dt><dd>TTL index on purge_at</dd></dl></div>
+    <div class="card"><h2 style="margin-bottom:10px">Claude Code</h2><dl class="kv"><dt>terminal</dt><dd>embedded · your machine</dd><dt>connection</dt><dd>MCP server “precedent”</dd><dt>tools</dt><dd>search_experiments · get_experiment · load_weights · publish_result</dd><dt>access</dt><dd>vision-research only</dd></dl></div>
+    <div class="card"><h2 style="margin-bottom:10px">Contributors in this project</h2><ul style="margin:0;padding-left:18px;font-size:13.5px;display:flex;flex-direction:column;gap:4px">${agents.map(a=>`<li>${esc(a)}</li>`).join('')}<li>you + Claude Code</li></ul></div>
+    <div class="card"><h2 style="margin-bottom:10px">Baseline</h2><p style="font-size:13.5px">“Claude Code on its own” is the same Claude Code run <b>outside Precedent</b>, with no MCP connection. It was recorded before the demo.</p><p class="muted" style="font-size:13px;margin-top:8px">${pct(BASELINE.acc)} accuracy · ${BASELINE.gpu} GPU-hours</p></div>
     <div class="card"><h2 style="margin-bottom:10px">Isolation check</h2><p class="muted" style="font-size:13px;margin-bottom:10px">Ask the same question from another team’s project.</p>
       <button class="btn ghost" data-act="iso">Run check</button>${S.isolation?'<p style="margin-top:10px"><span class="chip c-g">Found 0 results</span> <span class="chip c-g">Direct read refused (404)</span></p>':''}</div>
   </div>`;
@@ -469,26 +549,25 @@ function settingsPage(){
 /* ---------- inspector ---------- */
 function inspector(){
   const el=document.getElementById('insp'), sel=S.sel;
-  if(sel&&sel.f){const f=S.findings[sel.f], x=ratio(f), prev=f.history.find(h=>h.prev);
-    el.innerHTML=`<div class="eyebrow">Finding · ${refOf(f)}</div><h2>${esc(f.title)}</h2><div class="chips">${label(f)}</div>
-    <div class="isec" style="margin-top:14px"><h4>Tested on</h4><dl class="kv"><dt>cohort</dt><dd>${f.cohort}</dd><dt>job</dt><dd>${f.job}</dd><dt>messages</dt><dd>8 · ${IN} bytes</dd></dl></div>
-    <div class="isec"><h4>Result</h4>${x==null?`<p style="font-size:13.5px">${esc(f.error)} A crash doesn’t show whether the idea works, so agents never use it.</p>`:`${bar(x,true)}${legend()}<p class="num" style="font-size:13px">${f.out} / ${IN} bytes</p>`}</div>
-    ${prev?`<div class="isec"><h4>Versions</h4><div class="vers"><div class="ver"><b>v1 · old</b><span>${esc(prev.prev.title)}</span></div><div class="ver cur"><b>v2 · current</b><span>${esc(f.title)}</span></div></div><p class="muted" style="font-size:12px">People can read v1. Agents can only use v2.</p></div>`:''}
-    <div class="isec"><h4>History</h4><ul class="hist">${f.history.map(h=>`<li><span class="w">${h.at}</span><span>${h.action} by ${h.actor}${h.reason?` · “${esc(h.reason)}”`:''}</span></li>`).join('')}</ul></div>
-    <div class="isec"><h4>Rerun it</h4><pre class="code">python -m benchmark.run --job ${f.job} --cohort ${f.cohort}</pre></div>`;return}
+  if(sel&&sel.f){const f=S.findings[sel.f], prev=f.history.find(h=>h.prev), r=role(f);
+    el.innerHTML=`<div class="eyebrow">Experiment · ${refOf(f)}</div><h2>${esc(f.title)}</h2><div class="chips">${label(f)} ${r?roleChip[r]:''}</div>
+    <div class="isec" style="margin-top:14px"><h4>Trained on</h4><dl class="kv"><dt>model</dt><dd>${esc(f.model)}</dd><dt>dataset</dt><dd>${esc(f.dataset)}</dd><dt>images</dt><dd>${esc(f.image)}</dd><dt>settings</dt><dd>${esc(f.settings)}</dd></dl></div>
+    <div class="isec"><h4>Result</h4>${f.acc!=null?`${bar(f.acc,true)}${legend()}<p class="num" style="font-size:13px">${pct(f.acc)} accuracy · ${esc(f.gpu)}</p>`:`<p style="font-size:13.5px">${esc(f.error||f.accText)}${f.exec!=='completed'?' A crash doesn’t show whether the idea works, so it is never offered as evidence.':''}</p>`}</div>
+    ${f.weights?`<div class="isec"><h4>Weights</h4><dl class="kv"><dt>file</dt><dd>${f.weights.file}</dd><dt>size</dt><dd>${f.weights.size}</dd><dt>source</dt><dd>${esc(f.weights.src)}</dd><dt>stored in</dt><dd>Atlas GridFS · ${f.weights.id}</dd></dl></div>`:''}
+    ${prev?`<div class="isec"><h4>Versions</h4><div class="vers"><div class="ver"><b>v1 · old</b><span>${esc(prev.prev.title)}</span><span class="muted">${esc(prev.prev.dataset)}</span></div><div class="ver cur"><b>v2 · current</b><span>${esc(f.title)}</span><span class="muted">${esc(f.dataset)}</span></div></div><p class="muted" style="font-size:12px">People can read v1. Claude Code only gets v2.</p></div>`:''}
+    <div class="isec"><h4>History</h4><ul class="hist">${f.history.map(h=>`<li><span class="w">${h.at}</span><span>${h.action} by ${esc(h.actor)}${h.reason?` · “${esc(h.reason)}”`:''}</span></li>`).join('')}</ul></div>`;return}
   if(sel&&sel.ev!=null){const e=S.events[sel.ev];
     el.innerHTML=`<div class="eyebrow">Atlas · ${e.t}</div><h2>${esc(e.op)} · ${esc(e.coll)}</h2><p style="font-size:13.5px">${esc(e.detail)}</p>
     <div class="isec" style="margin-top:12px"><dl class="kv"><dt>time</dt><dd>${e.ms!=null?e.ms+' ms':'—'}</dd><dt>documents</dt><dd>${e.docs??'—'}</dd></dl></div>
     ${e.shape?`<div class="isec"><h4>What ran (simplified)</h4><pre class="code">${hl(e.shape)}</pre></div>`:''}`;return}
-  const d=S.decision;
-  if(S.page==='demo'&&d&&S.stage>=3&&S.stage<=6){
-    el.innerHTML=`<div class="eyebrow">Recommendation ${d.id}</div><h2>${d.job}</h2><div class="chips"><span class="chip ${d.status==='rejected'?'c-bad':d.status==='pending'?'c-b':'c-pos'}">${d.status}</span></div>
-    <div class="isec" style="margin-top:14px"><h4>Why</h4><p style="font-size:14px">${esc(d.reason)}</p></div>
-    <div class="isec"><h4>Evidence used</h4>${d.used.length?d.used.map(f=>`<div>${ref(f)} <span style="font-size:13px">${esc(f.title)}</span></div>`).join(''):'<span class="muted">None</span>'}</div>
-    ${d.rejected.length?`<div class="isec"><h4>Set aside</h4>${d.rejected.map(f=>`<div>${ref(f)} <span style="font-size:13px">${esc(f.title)}</span></div>`).join('')}</div>`:''}`;return}
-  el.innerHTML=`<div class="eyebrow">Details</div><h2>The task</h2><p style="font-size:14.5px">${REQUEST}</p>
-  <div class="isec" style="margin-top:14px"><h4>Same every run</h4><dl class="kv"><dt>messages</dt><dd>8, never seen by Agent A</dd><dt>target</dt><dd>40% of original size or less</dd><dt>choices</dt><dd>no dictionary, dictionary A, dictionary B</dd><dt>tries</dt><dd>1</dd></dl></div>
-  <p class="muted" style="font-size:13px;margin-top:8px">Click any result or any line in the Atlas activity strip to see it here.</p>`;
+  const c=S.context;
+  if(S.page==='demo'&&c&&S.stage>=2&&S.stage<=5){
+    const grp=(t,list)=>`<div class="isec"><h4>${t}</h4>${list.length?list.map(f=>`<div style="font-size:13.5px"><button class="ref" data-f="${f.key}">${refOf(f)}</button> ${esc(f.title)}</div>`).join(''):'<span class="muted" style="font-size:13px">None</span>'}</div>`;
+    el.innerHTML=`<div class="eyebrow">Claude Code’s context</div><h2>${S.decision?JOBS[S.decision.job].label:'Evidence'}</h2>${S.decision?`<div class="chips"><span class="chip ${S.decision.status==='rejected'?'c-bad':S.decision.status==='pending'?'c-b':'c-pos'}">${S.decision.status==='pending'?'waiting for you':S.decision.status}</span></div>`:''}
+    ${grp('Using',c.use)}${grp('Avoiding',c.avoid)}${grp('Doesn’t fit',c.nofit)}${c.dropped.length?grp('Left out by the platform',c.dropped.map(x=>x.f)):''}`;return}
+  el.innerHTML=`<div class="eyebrow">Details</div><h2>The task</h2><p style="font-size:14.5px">Train a ResNet-50 that reaches 75% accuracy on ImageNet within 8 GPU-hours.</p>
+  <div class="isec" style="margin-top:14px"><h4>How it works</h4><p style="font-size:13.5px">You browse past experiments, then ask Claude Code in the embedded terminal. It pulls experiments from Precedent, shows which it will use, and runs only what you tell it to.</p></div>
+  <p class="muted" style="font-size:13px;margin-top:8px">All numbers are mockup data. Click any experiment or Atlas line to see it here.</p>`;
 }
 
 /* ---------- render & events ---------- */
@@ -496,42 +575,35 @@ function render(){
   document.querySelectorAll('.nav button').forEach(b=>b.setAttribute('aria-current',b.dataset.page===S.page?'page':'false'));
   document.getElementById('page').innerHTML={demo:demoPage,research:researchPage,governance:govPage,settings:settingsPage}[S.page]();
   const rs=document.getElementById('rs'); if(rs) rs.addEventListener('submit',e=>{e.preventDefault();S.q=document.getElementById('rq').value;render()});
+  const tf=document.getElementById('tform'); if(tf) tf.addEventListener('submit',e=>{e.preventDefault();onSend(document.getElementById('tin').value.trim())});
+  const tb=document.getElementById('tbody'); if(tb) tb.scrollTop=tb.scrollHeight;
   inspector(); S.toast=null;
 }
-async function go(n){
-  S.stage=n;S.sel=null;render();
-  if(n===2&&S.memory==='on'&&!S.search&&!S.decision){await wait(350);doSearch();render()}
-  if(n===3&&!S.decision){await wait(250);decide();render()}
+async function onSend(text){
+  if(!text||S.busy) return;
+  const d=S.decision;
+  if(d&&d.status==='pending'&&S.pending==='decide') return runPlan(text);
+  return askClaude(text);
 }
+function go(n){S.stage=n;S.sel=null;render()}
 const showInsp=()=>{if(innerWidth<1180)document.getElementById('insp').scrollIntoView({behavior:'smooth'})};
 document.querySelector('.nav').addEventListener('click',e=>{const b=e.target.closest('[data-page]');if(b){S.page=b.dataset.page;S.sel=null;render()}});
 document.getElementById('lines').addEventListener('click',e=>{const b=e.target.closest('[data-ev]');if(b){S.sel={ev:+b.dataset.ev};inspector();showInsp()}});
 document.addEventListener('click',async e=>{
   const st=e.target.closest('[data-stage]'); if(st) return go(+st.dataset.stage);
-  const m=e.target.closest('[data-mem]'); if(m){S.memory=m.dataset.mem;S.search=null;S.decision=null;render();return}
   const a=e.target.closest('[data-act]');
-  if(a){const act=a.dataset.act,d=S.decision;
-    if(act==='next') return go(Math.min(7,S.stage+1));
+  if(a){const act=a.dataset.act;
+    if(act==='next') return go(Math.min(STAGES.length,S.stage+1));
     if(act==='prev') return go(Math.max(1,S.stage-1));
-    if(act==='runA'){await runAgentA(true);render();return}
-    if(act==='approve'||act==='approveAgain'){approve(d);render();return}
-    if(act==='reject'){reject(d);render();return}
-    if(act==='again'){if(S.memory==='on')doSearch();decide();render();return}
-    if(act==='execute'){execute(d);render();return}
+    if(act==='notnow') return notNow();
+    if(act==='askagain'){S.pending=null;return askClaude('Okay, propose it again.')}
     if(act==='correct'){correct(CORRECTION.reason);render();return}
-    if(act==='expire'){expire('failed','Superseded by newer measurements');render();return}
+    if(act==='expire'){expire('fastlr','From an old library version that has since been fixed');render();return}
     if(act==='expireAny'){expire(a.dataset.k,'No longer relevant');render();return}
-    if(act==='rerun'){if(S.memory==='on')doSearch();decide();render();return}
-    if(act==='approveRun'){approve(d);execute(d);render();return}
-    if(act==='iso'){log('aggregate','result_vectors','same search from project northwind-lab · 0 results',{ms:31,docs:0});log('find','results','direct read from northwind-lab · not found',{ms:3,docs:0});S.isolation=true;render();return}
+    if(act==='iso'){log('aggregate','result_vectors','same search from project other-lab · 0 results',{ms:31,docs:0});log('find','results','direct read from other-lab · not found',{ms:3,docs:0});S.isolation=true;render();return}
   }
   const f=e.target.closest('[data-f]'); if(f){S.sel={f:f.dataset.f};inspector();showInsp();return}
 });
 
-/* boot: Agent A has published; a memory-off baseline exists from rehearsal */
-(async()=>{
-  await runAgentA(false);
-  S.memory='off'; const d0=decide(); approve(d0); execute(d0); S.memory='on'; S.decision=null; S.search=null;
-  render();
-})();
+(async()=>{ await runAgents(false); render(); })();
 </script>
