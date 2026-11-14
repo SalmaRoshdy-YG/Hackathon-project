@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Precedent · Research workspace</title>
+<link rel="stylesheet" href="/vendor/xterm/css/xterm.css">
+<link rel="stylesheet" href="/style.css">
+<script type="module" src="/app.js"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="mark" aria-hidden="true">P</span><div><strong>Precedent</strong><small>Research memory</small></div></div>
+    <nav aria-label="Workspace">
+      <button data-view="workspace" aria-current="page">Workspace</button>
+      <button data-view="research">Research library</button>
+      <button data-view="runs">Run comparison</button>
+    </nav>
+    <div class="connection"><span class="dot" id="atlas-dot"></span><div>MongoDB Atlas<small id="connection">Connecting</small></div></div>
+  </aside>
+  <main>
+    <header class="heading"><p class="eyebrow" id="project">Research project</p><h1 id="title">Experiment workspace</h1></header>
+    <p id="error" class="error" role="alert" hidden></p>
+    <section id="workspace" class="view">
+      <div class="workflow" aria-label="Experiment workflow"><span>Find evidence</span><span>Review plan</span><span>Compare results</span></div>
+      <div class="panel">
+        <div class="section-head"><div><p class="eyebrow">Coding agent</p><h2>Codex terminal</h2></div>
+          <button id="terminal-toggle" class="primary" disabled>Open terminal</button>
+        </div>
+        <div class="terminal-shell" id="terminal-shell" hidden><div class="terminal-top"><span class="terminal-dots" aria-hidden="true">● ● ●</span><span id="terminal-status" role="status"></span></div><div id="terminal" aria-label="Agent terminal"></div></div>
+        <div class="agent-help"><p id="prompt"></p><button id="send-prompt" class="secondary" hidden>Insert suggested prompt</button></div>
+      </div>
+      <div class="panel" id="decision-panel">
+        <div class="section-head"><div><p class="eyebrow">Run review</p><h2>Experiment plan</h2></div><span id="plan-status"></span></div>
+        <div id="decision"></div>
+      </div>
+      <div class="panel">
+        <div class="section-head"><div><p class="eyebrow">Shared memory</p><h2>Retrieved evidence</h2></div><button id="open-research" class="secondary">Browse library</button></div>
+        <div id="candidates" class="stack"></div>
+      </div>
+    </section>
+    <section id="research" class="view" hidden>
+      <div class="panel">
+        <h2>Find experiments</h2>
+        <form id="search" class="search"><input id="query" aria-label="Search experiments" placeholder="Ask about a method or result" required maxlength="1500"><button class="primary">Search Atlas</button></form>
+        <label class="check"><input type="checkbox" id="match"> Compare with the active task conditions</label>
+        <div id="search-results" class="stack"></div>
+      </div>
+      <div class="panel"><div class="section-head"><h2>Past experiments</h2><span id="finding-count" class="muted"></span></div><div id="findings" class="stack"></div></div>
+    </section>
+    <section id="runs" class="view" hidden><div id="comparisons" class="stack"></div></section>
+    <section class="activity" aria-label="Live Atlas activity">
+      <div class="section-head"><strong>ATLAS ACTIVITY</strong><span id="stream-status">Connecting</span></div>
+      <div id="event-lines" class="activity-lines"></div>
+    </section>
+  </main>
+  <aside class="inspector"><p class="eyebrow">Evidence inspector</p><div id="inspector"></div></aside>
+</div>
+</body>
+</html>

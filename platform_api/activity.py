@@ -7,7 +7,7 @@ from time import monotonic
 from pymongo.monitoring import CommandListener
 
 scope = ContextVar("project", default=None)
-COLLECTIONS = {"results", "result_vectors", "result_versions", "decisions"}
+COLLECTIONS = {"results", "result_vectors", "result_versions", "decisions", "artifacts.files", "artifacts.chunks"}
 COMMANDS = {"aggregate", "insert", "update", "delete", "find", "getMore", "findAndModify",
             "commitTransaction", "abortTransaction"}
 SAFE_FIELDS = {"project_id", "_id", "version", "search_key", "expires_at", "execution", "validity",

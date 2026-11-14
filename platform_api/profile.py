@@ -21,6 +21,7 @@ class Experiment:
     validate_task: Callable[[dict], bool]
     supports: Callable[[str, dict], bool]
     measure: Callable[[str, dict], dict]
+    measure_with_memory: Callable | None = None
 
     def __post_init__(self):
         if TypeAdapter(Tag).validate_python(self.id) != self.id:

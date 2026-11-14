@@ -4,12 +4,13 @@ We’re building a shared research memory on MongoDB Atlas where AI agents save 
 
 > Memory isn’t just information an agent can retrieve. It’s evidence that can change what an agent does next.
 
-## The demo
+## Live application
 
-One live research handoff on a tiny experiment that runs in seconds with no model training: making short messages as small as possible. Agent A publishes findings, a fresh Agent B finds them by meaning, skips what failed and ignores a finding from another cohort, a human approves, the job runs and is measured, and then a correction and an expiry visibly change B’s next recommendation. [Demo sequence](REQUIREMENTS.md#demo-sequence) · [Interface](PLATFORM.md#user-interface)
+The Precedent workspace connects an embedded Codex terminal to shared research memory over MCP. Browse experiments, inspect what Codex cites, review its proposed job, and compare measured results. The ResNet-50 example uses handwritten digits and stores its checkpoints in Atlas GridFS. The workspace can use another registered experiment profile.
 
-- **Clickable demo:** open [docs/demo/index.html](docs/demo/index.html) in a browser. It simulates the seven stages with the planning-probe numbers as a design reference for the live UI.
-- **Pitch deck:** [docs/deck/precedent-deck.pptx](docs/deck/precedent-deck.pptx), 12 slides with speaker notes. Statistics on slide 2 are cited on the slide.
+- [Start the workspace and run ResNet-50](BACKEND.md#live-workspace)
+- [Open the original interface mockup](docs/demo/index.html)
+- [Read the pitch deck](docs/deck/precedent-deck.pptx)
 
 ## Start here
 

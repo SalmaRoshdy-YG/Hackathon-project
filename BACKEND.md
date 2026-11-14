@@ -2,6 +2,51 @@
 
 `platform_api/` is the reusable Atlas backend. `demo/` provides the guided browser workflow and rehearsal tools. It calls the same API a separate client would use.
 
+## Live workspace
+
+Use Python 3.11, Node.js, and a signed-in installation of Codex. Set the local Atlas credentials and project tokens as described below.
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-workbench.txt -r requirements-resnet.txt
+.\.venv\Scripts\python.exe -m pip install torch==2.15.0 torchvision==0.29.2 --index-url https://download.pytorch.org/whl/cpu
+npm ci
+.\.venv\Scripts\python.exe -m platform_api.preflight
+```
+
+Start the platform in one terminal.
+
+```powershell
+$env:MEMORY_EXPERIMENT_MODULE = 'experiments.resnet'
+.\.venv\Scripts\python.exe -m uvicorn platform_api.app:app --host 127.0.0.1 --port 8123
+```
+
+Start the workspace in another. Create the independent baseline once for a side-by-side comparison.
+
+```powershell
+$env:MEMORY_API_URL = 'http://127.0.0.1:8123'
+$env:MEMORY_EXPERIMENT_MODULE = 'experiments.resnet'
+New-Item -ItemType Directory -Force receipts | Out-Null
+.\.venv\Scripts\python.exe -m experiments.resnet train scratch holdout receipts/resnet-baseline.safetensors |
+  Set-Content -Encoding utf8 receipts/resnet-baseline.json
+$env:MEMORY_BASELINE_RECEIPT = 'receipts/resnet-baseline.json'
+.\.venv\Scripts\python.exe -m uvicorn workbench.app:app --host 127.0.0.1 --port 8124
+```
+
+In a third terminal, populate an empty project with measured calibration runs. This downloads the TorchVision ImageNet V1 initialization on first use and uploads two checkpoints. Run this once per project.
+
+```powershell
+$env:MEMORY_API_URL = 'http://127.0.0.1:8123'
+.\.venv\Scripts\python.exe -m experiments.resnet seed
+```
+
+Open [the local workspace](http://127.0.0.1:8124). In the Research library, check that the calibration results have appeared. Open the Codex terminal in Workspace. Once the Codex prompt appears, choose **Insert suggested prompt**, then press Enter in the terminal. Review the cited evidence and choose **Run plan**. The trained checkpoint and new finding appear in Run comparison and in the Research library. If Codex is outside PATH, set `MEMORY_CODEX_BIN` to the executable path before starting the workspace.
+
+The Codex terminal connects to the loopback MCP endpoint. The workspace keeps Atlas credentials server-side. The ResNet runner streams the exact checkpoint cited by the plan, checks the SHA-256 before loading it, trains on a split disjoint from calibration, and publishes the observed accuracy and output weights. The locally measured comparison uses four epochs per run. Scratch trains the full model from random initialization, and reuse trains the head with the retrieved backbone frozen, so elapsed times describe the two configurations, including their different trainable parameter counts. The CPU timing covers training and evaluation. GridFS transfer and setup time are outside that metric. The deck's ImageNet and GPU-hour figures are simulated.
+
+For another experiment, set `MEMORY_EXPERIMENT_MODULE` to its registered profile in both services, or leave it unset to browse, publish, and search findings without a runner. The optional `DEFAULTS` profile dictionary supplies a suggested `question` and task `conditions`. `MEMORY_BASELINE_RECEIPT` is optional.
+
+For a temporary HTTPS preview, keep the workbench listening on loopback and forward it through an HTTPS proxy that preserves Host and WebSocket upgrades. Set a unique random `MEMORY_REMOTE_PASSWORD` on the workbench and set `MEMORY_LOCAL_MCP_URL` to its loopback MCP URL, such as `http://127.0.0.1:8124/mcp`. The remote browser signs in once and receives a secure cookie. The terminal connects to the local MCP endpoint, and the remote activity view polls through the proxy.
+
 ## Run it
 
 Use Python 3.11. On this workstation the repository already has an ignored `.env` with a scoped Atlas account and four server-side demo identities.

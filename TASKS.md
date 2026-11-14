@@ -82,3 +82,10 @@ Backend branch: `backend/precedent-mongo`. See [BACKEND.md](BACKEND.md) for the 
 The platform and presenter also passed an alternate experiment end to end with `python -m tests.check_lookup_profile`. The same API approved and measured 122 / 7 / 122 / 122 comparisons with its own job catalog, condition fields, reproduction data, and correction. Atlas preflight and the default presenter rehearsal passed after the profile refactor.
 
 The compression implementation and its rehearsal have been retired. The Atlas and presenter checks use an ordered-lookup test fixture. The selected experiment will plug in through the profile documented in BACKEND.md.
+
+### Live workspace handoff
+
+- Started from `main` at `fd3a73b`. The [live workspace startup and training steps](BACKEND.md#live-workspace) run the Codex terminal, Atlas-backed research library, and run comparison.
+- Ran `python -m experiments.resnet seed` and `python -m experiments.resnet train scratch holdout receipts/resnet-baseline.safetensors`. The scratch run measured 29.2% on the holdout. Codex searched Atlas through MCP and produced a plan citing a compatible calibration result. After browser confirmation the ResNet job measured 90.4% on the same holdout, published a finding, and saved the weights to GridFS. Verified the output byte count and SHA-256 through the download route and a 404 for the second project.
+- Passed `python -m platform_api.preflight`, `python -m unittest discover -s tests`, `python -m tests.check_standalone`, and `python -m tests.check_lookup_profile`. The lookup test used its own job catalog and fixture, with 122 comparisons for the baseline and 7 with memory.
+- Verified the HTTPS preview from a browser, including sign-in, blocked anonymous API reads, blocked external MCP, the run comparison and the Codex terminal over WebSocket.

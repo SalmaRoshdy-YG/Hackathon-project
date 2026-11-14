@@ -131,7 +131,7 @@ class Decisions:
 
         try:
             # No intervening caller round trip between the authoritative read and job dispatch.
-            self.store.resolve(identity, citations(plan), plan.conditions, experiment.match_fields)
+            refs = self.store.resolve(identity, citations(plan), plan.conditions, experiment.match_fields)
         except HTTPException as exc:
             if exc.status_code != 404:
                 raise
@@ -141,7 +141,12 @@ class Decisions:
             raise
 
         try:
-            measured = experiment.measure(plan.job_id, plan.conditions.root)
+            if experiment.measure_with_memory is None:
+                measured = experiment.measure(plan.job_id, plan.conditions.root)
+            else:
+                sources = {(r.result_id, r.version) for r in plan.used_refs}
+                inputs = [r for r in refs if (r["result_id"], r["version"]) in sources]
+                measured = experiment.measure_with_memory(plan.job_id, plan.conditions.root, self.store, identity, inputs)
         except Exception:
             return self.finish(query, claim, "aborted", {"abort_reason": "runner_failed"})
         receipt = {**measured, "decision_id": decision_id, "request": plan.request,
