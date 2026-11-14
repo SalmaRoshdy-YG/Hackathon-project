@@ -1,6 +1,8 @@
 # Backend setup and frontend handoff
 
-`platform_api/` is the reusable Atlas backend. `demo/` provides the guided browser workflow and rehearsal tools. It calls the same API a separate client would use.
+`platform_api/` is the reusable Atlas backend. `demo/` provides the presenter service and checks. It calls the same API a separate client would use.
+
+**Status.** The platform, the ResNet-50 digits experiment and the live workspace are built, and a teammate reports them verified on the event Sandbox (see [TASKS.md](TASKS.md#handoffs)). The `demo/` presenter is the earlier scripted-agent path, kept as a fallback. The `memory: on|off` proposal field exists for the backend's own contract tests. The demo's baseline is the agent run outside Precedent, not this flag.
 
 ## Live workspace
 
@@ -72,7 +74,7 @@ The standalone API supports publishing, search, correction, expiry, and history.
 Configure the new experiment and its optional guided workflow in the local environment. A fresh local environment can be created with python -m demo.setup.
 
 ~~~dotenv
-MEMORY_EXPERIMENT_MODULE=your_experiment.profile
+MEMORY_EXPERIMENT_MODULE=benchmark.profile
 MEMORY_PRESENTATION_MODULE=your_experiment.presentation
 ~~~
 
@@ -88,7 +90,7 @@ The [presenter routes](PLATFORM.md#presenter-service) define request fields. Run
 
 - `GET /demo/state` returns findings, the latest decision, the most recent evidence cards, all recent receipts, and the active stream modes. The latest stage and evidence-card snapshot live for the presenter process; findings, decisions and receipts are durable.
 - `new EventSource('/demo/events')` delivers named `atlas` and `change` events. Use `change` to refresh state for the current view. Atlas events contain `command`, `collection`, `ms`, `docs`, `scope`, `ok` and a redacted `shape`; these are from PyMongo monitoring. In particular, `scope: "isolation-check"` labels commands executed with the second project identity. Results and decisions use scoped change streams. Reconnects replay recent events when available.
-- `POST /demo/agent-a`, then `POST /demo/agent-b` with `{"memory":"off"}` for a baseline. Call Approve, then Execute, separately. Next run Agent B with `{"memory":"on"}`. Reject prevents execution. The presenter waits for expected versions to appear in the index after publication or correction.
+- `POST /demo/agent-a`, then `POST /demo/agent-b` with `{"memory":"off"}` (backend contract tests only; the demo baseline is recorded outside Precedent). Call Approve, then Execute, separately. Next run Agent B with `{"memory":"on"}`. Reject prevents execution. The presenter waits for expected versions to appear in the index after publication or correction.
 - Select result IDs from the producer response for Correct and Expire. Send `result_id`, `expected_version`, and a reason. After each call, `POST /demo/rerun` repeats the last memory setting on the same task. Approve and execute each new decision. History and evidence are available under `/demo/results/{result_id}/history` and `/demo/results/{result_id}/evidence?version=1`.
 - `POST /demo/isolation-check` checks that the unseeded second project returns no candidates and direct result/evidence reads return 404. The guided platform check also verifies selectivity with a distinct, authorized sentinel in each project.
 

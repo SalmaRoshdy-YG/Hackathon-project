@@ -2,28 +2,32 @@
 
 Each teammate uses their own coding assistant with the same [platform contract](PLATFORM.md) and [task board](TASKS.md). The [README](README.md) has the prompt to start or resume any task.
 
-## Kickoff
-
-Assign workstream owners, integration lead, and submitter. Choose one fast CPU benchmark, the shared entry point, and the model and embedding setup. Product scope is in [REQUIREMENTS.md](REQUIREMENTS.md). Record decisions and example payloads in PLATFORM.md before callers diverge. The Atlas owner verifies access, starts the search index early, and tests an authorized query. Teammates can use separate fixture namespaces for smoke checks.
-
 ## Build and integrate
 
-1. Get one vertical slice working. Publish a measured outcome through the platform, retrieve it from event Atlas, and get a second agent to run a job. Carry the memory ID and version into the decision receipt.
-2. Add the approval step and the presenter service, and drive the same slice from the UI. Teammates can work against stubs while Atlas is getting ready. Label stub-only checks in the handoff.
-3. Add correction, expiry, and isolation. Rehearse from a clean checkout. Leave the exact commands and results on the task board so the next teammate can pick up immediately.
+1. **Verify what exists.** Run the Atlas preflight and the platform checks against the event Sandbox. Teammates can work against stubs while Atlas is verified. Label stub-only checks in the handoff.
+2. **Get one real slice.** Seed the ResNet experiments (with checkpoints), search them from event Atlas, and have Codex propose a plan citing exact versions.
+3. **Close the loop.** Add the approval step and the run: press Run plan in the browser, train from the stored checkpoint, save the result and new checkpoint back.
+4. **Wire the screen.** The UI shows the same slice from real events. Then rehearse from a clean checkout.
+5. **Only then** add Phase 2 governance (correct, expire) to the live flow.
 
-Use separate branches or worktrees as needed. Agree on an owner for any shared file being edited in parallel. Keep credentials in local environment variables, use synthetic fixtures, and record upstream notices in the public repository.
+Use separate branches or worktrees. Agree on an owner for any shared file edited in parallel. Keep credentials in local environment variables and out of the public repo, and record upstream notices.
 
 ## Demo acceptance
 
 | Claim | Evidence |
 | --- | --- |
-| Persistent governed memory | A fresh agent retrieves applicable evidence via event Atlas Vector Search after the producer exits. Use a paraphrased request and an inapplicable distractor to show why experimental conditions matter. |
-| Memory changes behavior | With the same request, candidate jobs, and budget, compare actual executed configurations and outcomes with memory off, on, after correction, and after correction and expiry. Capture the exact result versions used. |
-| Lifecycle and isolation | The owning project can search and look up the result. A second project fails both paths. Stale hits for expired or superseded versions are excluded. |
-| MongoDB visibly does the work | The Atlas activity strip and the per-stage callouts show the real search pipeline, atomic approval, the correction transaction, the dropped stale entry, and live change-stream updates. |
-| Humans govern it | A human approves or rejects each recommendation from the UI, and nothing runs without approval. Correction and expiry are done from the UI as separate events, each followed by a rerun of the same query, and version history stays visible. |
+| Persistent shared memory | A fresh Codex session retrieves relevant experiments via event Atlas Vector Search after the seeding agents have exited, using a differently worded request and a distractor that doesn't fit. |
+| Memory changes behavior | With the same request, candidate jobs and budget, compare the executed job, accuracy and training time for Codex on its own and Codex with Precedent. Capture the exact versions cited. |
+| Humans decide | The Run plan button is the only way a plan runs. Reject leaves no run, and a plan runs at most once. |
+| Isolation | The owning project finds and reads its experiments. A second project fails both search and direct read. |
+| MongoDB visibly does the work | The Atlas strip and the per-stage sentence show the real search pipeline, the atomic approval, the weights stream and the live change-stream insert. |
 
-Suggested milestones in Toronto time are a real Atlas round trip by noon, an end-to-end path by 2 p.m., and a demo freeze at 4 p.m. Adjust them at kickoff and protect the 5 p.m. submission deadline. Cut demo polish and Settings extras first if time is tight.
+## Fallbacks
 
-Center the one-minute submission video on the different jobs actually executed. Use the three-minute live demo to walk the seven Demo stages: the Atlas path, applicability, approval, the measured result, correction and expiry with reruns, and project isolation. Confirm the repository is public, the video is accessible, and all team members are listed. [Submission form](https://cerebralvalley.ai/events/~/e/mongodb-toronto-hackathon/hackathon/submit)
+If Codex is unstable, run a scripted planner that applies the same evidence rules and label it. If the embedded terminal fails, run Codex in a normal terminal beside the browser. If Atlas becomes unavailable late, present verified receipts from an earlier real run and say so. Cut polish before cutting the real Atlas search, the approval or the real training run.
+
+## Submission
+
+Center the one-minute video on the different jobs that actually ran. Use the three-minute live demo to walk the four stages. Confirm the repository is public, the video is accessible signed out, and all team members are listed. [Submission form](https://cerebralvalley.ai/events/~/e/mongodb-toronto-hackathon/hackathon/submit)
+
+The timings and the demo script are in [TASKS.md](TASKS.md#time-plan-to-the-500-pm-submission).

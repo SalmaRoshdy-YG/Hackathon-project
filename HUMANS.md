@@ -1,47 +1,48 @@
 # Human review guide
 
-Start with one question. **Did a fresh agent use another agent’s measured result to recommend a different experiment, which a human approved and which then ran?** Follow the decision back to the exact version of the result and its evidence. Check that the conditions match and that the platform enforces who can still read and use it.
+Start with one question. **Did Codex use another agent's measured result and stored weights to choose a different experiment, which a person confirmed, which then really trained and did better?** Follow the plan back to the exact version of each result it cited. Check that the conditions match and that the platform, not the agent, enforces who can read what.
 
 ## Where to read
 
 | File | What to look for |
 | --- | --- |
-| [README.md](README.md) | The project in one paragraph, the demo, and how to join the build. |
-| [REQUIREMENTS.md](REQUIREMENTS.md) | The agreed MVP in plain words, requirements R1–R11, the demo sequence, what is out of scope, and the decisions log. |
-| [BRIEF.md](BRIEF.md) | The judging requirements, the event deadline, and the pinned ARA and AutoSci sources. |
-| [PLATFORM.md](PLATFORM.md) | The benchmark, API and permissions, approval, history, presenter service, expected receipts, interface and credits. |
-| [TASKS.md](TASKS.md) | Owners, acceptance checks, schedule, and the latest commands and observed results. |
-| [HARNESS.md](HARNESS.md) | The order of integration and the evidence to show in the demo. Use the task board for current milestones. |
-| [AGENTS.md](AGENTS.md) | The instructions teammates and their coding assistants follow when implementing and verifying work. |
-| [GOAL-PROMPT.md](GOAL-PROMPT.md) | The original kickoff planning assignment. |
+| [README.md](README.md) | The project, the demo, and what is built. |
+| [REQUIREMENTS.md](REQUIREMENTS.md) | The MVP requirements R1–R11, the interface, scope and the decisions log. |
+| [PLATFORM.md](PLATFORM.md) | The experiment, API, search pipeline, agent integration, interface and credits. |
+| [BACKEND.md](BACKEND.md) | How to run the Atlas backend and its checks. |
+| [TASKS.md](TASKS.md) | Owners, gates and their status, and the latest commands and observed results. |
+| [HARNESS.md](HARNESS.md) | Integration order and demo evidence. |
+| [BRIEF.md](BRIEF.md) | Event rules and judging criteria. |
 
 ## What you can verify today
 
-The standalone API and presenter can be checked against Atlas independently of the selected experiment. The lookup data in tests is a verification fixture.
+- **Read:** the backend code in `platform_api/`, especially the single search aggregation in `store.py` and the atomic approval in `decisions.py`.
+- **Run offline:** `python -m unittest discover -s tests`. It does not touch Atlas.
+- **Look:** [docs/demo/index.html](docs/demo/index.html), the design mockup (being updated to the real task). The live app is `workbench/`.
+- **Reported by a teammate, not re-run by the reviewer:** the live Atlas round trip, the ResNet run (29.2% then 90.4%), the MCP tools and the embedded terminal. Treat a gate as passed only when [TASKS.md](TASKS.md) has a commit, an exact command and an observed result for it.
 
-The event Atlas round trip, applicability labels, approval, agent execution, lifecycle checks and the guided UI are build gates. Look for a handoff with a commit, an exact command, and an observed result before treating a gate as passed. A fixture or stub result can verify wiring. The live Atlas gate requires an event Sandbox run. [Verification gates](TASKS.md#verification-gates) · [Handoffs](TASKS.md#handoffs)
-
-## How to review a build
-
-From the repository root, use a clean checkout and Python 3.11. Ask P1 for the local Sandbox and credential setup, and P4 for the command and commit from the latest rehearsal handoff. The planned entry points below become runnable as their owners land them. Keep credentials and private receipts local.
+## How to review a finished build
 
 ```sh
 python -m pip install -r requirements.txt
 python -m platform_api.preflight
-python -m demo.check_platform
-python -m demo.check_presenter
+python -m tests.check_standalone
+python -m experiments.resnet train scratch holdout receipts/baseline.safetensors
 ```
 
-For API startup and configuring the selected experiment, see [Backend setup](BACKEND.md).
+The preflight and the standalone check need the event Atlas Sandbox and local credentials. Ask the platform owner for the environment setup. Keep credentials and private receipts local.
 
 | Claim | What to inspect |
 | --- | --- |
-| A publishes useful evidence | Find the positive, valid negative, other-cohort and crashed receipts. Completed ones show the fixture, cohort, job, measured ratio, threshold, successful decode and a rerun command. The crash is `crashed / invalid / undetermined` and never appears in search. |
-| B finds relevant research | After A exits, use a fresh B session. Its paraphrased question should find the two applicable cohort A findings and the cohort B finding through Atlas Vector Search, with the platform labelling the cohort B finding as a mismatch. |
-| Memory changes a real job | Compare the off, on, after-correction and after-correction-and-expiry receipts. Request, candidate jobs and one-job budget should match. Check that the approved memory-on job differs from the baseline because of the cited evidence. Each receipt records who approved it. The rejected decision has no receipt. |
-| Access and lifecycle work | Both projects should find their own sentinels. A second project’s direct result and evidence reads should return 404 for the first project’s ref. A superseded or expired version should fail direct read, evidence read, and execution resolution, even if its stale search hit is still present, while history still shows it to project members. |
-| Humans stay in control | Start the presenter and walk the Demo page: reject once and confirm nothing ran, approve and see the measured result, correct and expire from the UI and rerun. In Research, the expired finding shows as Expired and the corrected one shows v1 and v2. Settings shows the isolation check. |
+| Experiments are stored with evidence | The positive, the valid negative, the 32 px mismatch and the crashed run (the crash is not seeded yet), each with conditions, a receipt and a rerun command. The crash is `crashed / invalid / undetermined` and never appears in search. |
+| Codex finds them by meaning | A differently worded question returns the ResNet-50 digit experiments after the seeding agents have exited. The platform labels the 32 px experiment as not fitting, naming `image_px`. |
+| Memory changes a real job | Compare Codex on its own (`scratch`, measured once at 29.2%) with Codex and Precedent (`reuse`, measured once at 90.4%). Request, catalog and one-run budget are identical. The receipt records the exact versions cited and who approved. |
+| Humans stay in control | Reject leaves no run. Run plan runs once, even if triggered twice. |
+| Access works | A second project's search returns nothing and its direct reads return 404. |
+| MongoDB visibly does the work | The Atlas strip shows the real `aggregate`, the conditional approval update and the new insert. Nothing in it is hardcoded. |
+
+Governance (correct, expire, history) exists in the backend and is exercised by the backend checks. It is not part of the live demo yet.
 
 ## Record what you saw
 
-Add the task ID, commit, exact command or browser steps, observed outcome, and any missing dependency to the task board. Link the redacted receipt or assertion summary if available. For a failed claim, include the smallest reproducible example, the expected behavior, and what actually happened. [Team handoffs](TASKS.md#handoffs)
+Add the task ID, commit, exact command or browser steps, observed outcome and any missing dependency to the task board. For a failed claim, include the smallest reproducible example, the expected behavior and what actually happened.

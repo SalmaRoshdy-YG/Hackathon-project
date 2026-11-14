@@ -2,7 +2,8 @@
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<!-- Clickable demo mockup: ResNet-50 on ImageNet with shared memory of results and saved weights. All numbers are simulated mockup data. -->
+<!-- Clickable demo mockup. One screen, centred on Claude Code and the decision it makes. Task: fine-tune ResNet-18 on CIFAR-10 in a 2 GPU-minute budget.
+     All numbers are illustrative until the benchmark owner replaces them with measured runs from our GPU PC (see PLATFORM.md, Benchmark). -->
 <style>[hidden]{display:none!important}body{margin:0}</style>
 <title>Precedent Research Memory</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -10,13 +11,12 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: dark green sidebar | light workspace (stage + Atlas activity strip) | evidence inspector. One light look by design. */
 :root{
   color-scheme:light;
-  --side:#0D3A2C; --side-2:#134A39; --side-ink:#E4F1EA; --side-muted:#9CC0AF; --side-line:#1F5845;
+  --side:#0D3A2C; --side-2:#134A39; --side-ink:#E4F1EA; --side-muted:#9CC0AF;
   --bg:#F5F7F3; --surface:#FFFFFF; --sunk:#EDF1EB; --line:#DAE1D8; --ink:#13201A; --muted:#5A6961;
   --green:#147D52; --green-2:#0E6342; --green-soft:#E0F1E7; --mint:#5FD39A;
-  --a:#94560C; --a-soft:#F3E6D2; --b:#3B4CB0; --b-soft:#E4E7F7;
+  --b:#3B4CB0; --b-soft:#E4E7F7;
   --pos:#167A40; --pos-soft:#DDF0E3; --neg:#B04E1B; --neg-soft:#F7E4D8; --bad:#B12236; --bad-soft:#F6DEE2; --off:#66736C; --off-soft:#EAEDE9;
   --code-bg:#0F241C; --code-fg:#D3E6DC; --code-k:#7FD8AC; --code-s:#EBC28C; --code-n:#AEB9F4; --code-c:#7D9389;
   --shadow:0 1px 2px rgba(19,32,26,.06),0 6px 18px rgba(19,32,26,.06);
@@ -29,581 +29,311 @@ html,body{height:100%;background:var(--bg)}
 body{color:var(--ink);font:15px/1.5 var(--f-body);-webkit-font-smoothing:antialiased}
 button{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:6px}
+p{margin:0}
 .mono{font-family:var(--f-mono);font-size:.86em}
-.num{font-variant-numeric:tabular-nums}
 .muted{color:var(--muted)}
 
-.app{display:grid;grid-template-columns:220px minmax(0,1fr) 340px;min-height:100%}
-@media (max-width:1180px){.app{grid-template-columns:200px minmax(0,1fr)}.insp{grid-column:2}}
-@media (max-width:760px){.app{grid-template-columns:minmax(0,1fr)}.insp{grid-column:1}}
+/* ---- top bar: brand, four stages, Atlas status ---- */
+.top{background:var(--side);color:var(--side-ink);display:flex;align-items:center;gap:20px;flex-wrap:wrap;padding:12px max(20px,env(safe-area-inset-right,0px)) 12px max(20px,env(safe-area-inset-left,0px))}
+.brand{display:flex;align-items:center;gap:10px}
+.brand b{font:700 19px/1 var(--f-display)}
+.brand small{display:block;font-size:11px;color:var(--side-muted);margin-top:2px}
+.steps{display:flex;gap:6px;flex:1;min-width:280px;justify-content:center;flex-wrap:wrap}
+.steps li{list-style:none;display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:99px;font-size:13px;color:var(--side-muted)}
+.steps ol{display:contents}
+.steps .n{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font:600 11.5px var(--f-mono);background:var(--side-2)}
+.steps li.done{color:var(--side-ink)} .steps li.done .n{background:var(--mint);color:var(--side)}
+.steps li.now{background:var(--side-2);color:#fff;font-weight:600} .steps li.now .n{background:#fff;color:var(--side)}
+@media (max-width:760px){.steps li span.l{display:none}.steps li.now span.l{display:inline}}
+.pill{display:flex;align-items:center;gap:8px;background:var(--side-2);border-radius:10px;padding:7px 11px;font-size:12.5px}
+.pill i{width:8px;height:8px;border-radius:50%;background:var(--mint);box-shadow:0 0 0 3px rgba(95,211,154,.25)}
+.mock{font:500 10.5px var(--f-mono);color:var(--side-muted)}
 
-.side{background:var(--side);color:var(--side-ink);display:flex;flex-direction:column;gap:22px;padding:20px 14px calc(18px + env(safe-area-inset-bottom,0px)) max(14px,env(safe-area-inset-left,0px));position:sticky;top:0;height:100vh}
-@media (max-width:760px){.side{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;padding:12px 16px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));gap:10px}}
-.brand{display:flex;align-items:center;gap:10px;padding:2px 6px}
-.brand b{font:700 20px/1 var(--f-display)}
-.brand small{display:block;font-size:11.5px;color:var(--side-muted);margin-top:3px}
-.nav{display:flex;flex-direction:column;gap:2px}
-@media (max-width:760px){.nav{flex-direction:row;flex-wrap:wrap}}
-.nav button{display:flex;align-items:center;gap:10px;border:0;background:transparent;color:var(--side-muted);text-align:left;padding:10px;border-radius:9px;cursor:pointer;font-weight:500}
-.nav button svg{width:17px;height:17px;flex:none}
-.nav button:hover{color:var(--side-ink);background:var(--side-2)}
-.nav button[aria-current="page"]{background:var(--side-2);color:#fff;box-shadow:inset 3px 0 0 var(--mint)}
-.side-foot{margin-top:auto;display:flex;flex-direction:column;gap:8px;font-size:12px;color:var(--side-muted)}
-@media (max-width:760px){.side-foot{margin:0 0 0 auto}}
-.atlas-pill{display:flex;align-items:center;gap:9px;background:var(--side-2);border:1px solid var(--side-line);border-radius:10px;padding:9px 10px;color:var(--side-ink)}
-.atlas-pill .dot{width:8px;height:8px;border-radius:50%;background:var(--mint);box-shadow:0 0 0 3px rgba(95,211,154,.25);flex:none}
-.atlas-pill small{display:block;color:var(--side-muted);font-size:11px}
-.mockflag{font:500 10.5px/1.4 var(--f-mono);padding:0 4px}
-@media (max-width:760px){.mockflag{display:none}}
-
-.work{display:flex;flex-direction:column;min-width:0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:16px}
-@media (min-width:761px){.work{padding-left:32px;padding-right:28px}}
-@media (max-width:760px){.work{padding-right:max(16px,env(safe-area-inset-right,0px))}}
-.page{flex:1;padding-block:26px 18px;display:flex;flex-direction:column;gap:18px;min-width:0;max-width:980px}
-.eyebrow{font:500 11px var(--f-mono);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
-h1{font:700 clamp(24px,2.8vw,32px)/1.15 var(--f-display);letter-spacing:-.015em;margin:4px 0 0;text-wrap:balance}
-h2{font:700 18px/1.25 var(--f-display);margin:0}
-h3{font:600 15px/1.3 var(--f-display);margin:0}
-p{margin:0}
-.lede{font-size:16.5px;color:var(--muted);max-width:62ch}
-
-.stepper{display:flex;gap:4px;overflow-x:auto}
-.stepper button{flex:1;min-width:44px;border:0;background:transparent;padding:6px 2px 8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
-.stepper .dotn{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font:600 12px var(--f-mono);background:var(--sunk);color:var(--muted)}
-.stepper button.done .dotn{background:var(--green-soft);color:var(--green)}
-.stepper button[aria-current="step"] .dotn{background:var(--green);color:#fff}
-.stepper button[aria-current="step"]{color:var(--ink);font-weight:600}
-.stepper .lbl{text-align:center;line-height:1.2}
-@media (max-width:860px){.stepper .lbl{display:none}}
-.stagebar{display:flex;gap:10px;align-items:center;justify-content:flex-end}
-
+/* ---- main stage ---- */
+.stage{max-width:1240px;margin:0 auto;padding:22px max(20px,env(safe-area-inset-left,0px)) 130px;display:flex;flex-direction:column;gap:16px}
+.task{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.task h1{font:700 clamp(21px,2.4vw,28px)/1.2 var(--f-display);letter-spacing:-.01em;margin:0;text-wrap:balance}
+.task .sub{color:var(--muted);font-size:14px;margin-top:3px}
 .btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--green);background:var(--green);color:#fff;padding:9px 16px;border-radius:9px;font-weight:600;font-size:14px;cursor:pointer;white-space:nowrap}
-.btn:hover{background:var(--green-2)}
+.btn:hover{background:var(--green-2)} .btn[disabled]{opacity:.4;cursor:not-allowed}
 .btn.ghost{background:var(--surface);color:var(--green)}
-.btn.ghost:hover{background:var(--green-soft)}
-.btn.danger{background:var(--surface);color:var(--bad);border-color:var(--bad)}
-.btn.danger:hover{background:var(--bad-soft)}
-.btn[disabled]{opacity:.4;cursor:not-allowed}
-.link{border:0;background:none;color:var(--green);font-weight:600;cursor:pointer;padding:0;text-decoration:underline;text-underline-offset:2px;font-size:13.5px}
-
-.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--shadow);min-width:0}
-.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
-.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
-@media (max-width:900px){.grid3{grid-template-columns:minmax(0,1fr)}}
-@media (max-width:620px){.grid2{grid-template-columns:minmax(0,1fr)}}
-
-.mongo{display:flex;gap:12px;align-items:flex-start;background:#EEF8F2;border:1px solid #BFE3CF;border-radius:12px;padding:12px 14px}
-.mongo .leaf{width:30px;height:30px;border-radius:8px;background:var(--side);display:grid;place-items:center;flex:none}
-.mongo .leaf svg{width:16px;height:16px}
+.mongo{display:flex;gap:12px;align-items:flex-start;background:#EEF8F2;border:1px solid #BFE3CF;border-radius:12px;padding:11px 14px}
+.mongo .leaf{width:28px;height:28px;border-radius:8px;background:var(--side);display:grid;place-items:center;flex:none}
 .mongo .t{display:block;font:600 10.5px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--green);margin-bottom:2px}
-.mongo p{font-size:14.5px}
+.mongo p{font-size:14px}
 
-.fcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
-.fcard{text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:14px;cursor:pointer;display:flex;flex-direction:column;gap:10px;min-width:0;transition:border-color .2s}
-.fcard:hover{border-color:var(--muted)}
-.fcard .t{font-weight:600;font-size:14px;line-height:1.3}
-.fcard .s{font-size:12px;color:var(--muted)}
-.chips{display:flex;gap:5px;flex-wrap:wrap}
+.split{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr);gap:16px;align-items:start}
+@media (max-width:1000px){.split{grid-template-columns:minmax(0,1fr)}}
+.panel-h{display:flex;align-items:baseline;justify-content:space-between;margin:0 0 8px;font:600 12px var(--f-mono);letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+
+/* ---- terminal (the centrepiece) ---- */
+.term{background:var(--code-bg);color:var(--code-fg);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--shadow)}
+.term .bar-t{display:flex;align-items:center;gap:7px;padding:9px 12px;background:#0A1A14;font:500 11.5px var(--f-mono);color:var(--code-c)}
+.term .bar-t i{width:10px;height:10px;border-radius:50%;background:#2E4A3E}
+.term .bar-t span{margin-left:6px}
+.term .body{padding:14px 16px;font:13px/1.7 var(--f-mono);height:440px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}
+.term .you{color:#9EE6C2}.term .you::before{content:"> ";color:var(--mint)}
+.term .cl::before{content:"⏺ ";color:#E8C08A}
+.term .tool{color:var(--code-c)}.term .tool::before{content:"  ⎿ "}
+.term .good{color:#7FD8AC}.term .badv{color:#F2A27C}.term .dim{color:var(--code-c)}
+.term .inrow{display:flex;gap:8px;padding:10px 12px;border-top:1px solid #1E3A2F;align-items:center}
+.term .inrow b{color:var(--mint);font:600 13px var(--f-mono)}
+.term .inrow input{flex:1;min-width:0;background:transparent;border:0;color:#E4F1EA;font:13px var(--f-mono);outline:none}
+.term .inrow button{border:1px solid var(--mint);background:transparent;color:var(--mint);border-radius:7px;padding:6px 12px;font:600 12.5px var(--f-body);cursor:pointer}
+.term .inrow button:hover:not([disabled]){background:rgba(95,211,154,.14)}
+.term .inrow button.no{border-color:#F2A27C;color:#F2A27C}
+.term .inrow button[disabled]{opacity:.4;cursor:not-allowed}
+
+/* ---- experiments the agent reads ---- */
+.xlist{display:flex;flex-direction:column;gap:8px}
+.xrow{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface);cursor:pointer;text-align:left;width:100%;transition:border-color .3s,background .3s,box-shadow .3s,opacity .3s}
+.xrow:hover{border-color:var(--muted)}
+.xrow .t{flex:1;min-width:0;font-weight:600;font-size:13.5px;line-height:1.35}
+.xrow .t small{display:block;font-weight:400;color:var(--muted);font-size:12px}
+.xrow.use{border-color:var(--green);background:#F2FAF5;box-shadow:0 0 0 2px var(--green-soft)}
+.xrow.avoid{border-color:#E8B79B;background:#FDF6F2}
+.xrow.nofit{opacity:.62}
+.xrow.new{border-color:var(--b);box-shadow:0 0 0 2px var(--b-soft)}
 .chip{font:600 11.5px/1 var(--f-body);padding:5px 8px;border-radius:6px;white-space:nowrap;display:inline-block}
 .c-pos{background:var(--pos-soft);color:var(--pos)} .c-neg{background:var(--neg-soft);color:var(--neg)} .c-bad{background:var(--bad-soft);color:var(--bad)}
 .c-off{background:var(--off-soft);color:var(--off)} .c-b{background:var(--b-soft);color:var(--b)} .c-g{background:var(--green-soft);color:var(--green)}
-.c-line{background:transparent;color:var(--muted);border:1px solid var(--line);padding:4px 7px}
 
-.bar{position:relative;height:10px;border-radius:5px;background:var(--sunk)}
-.bar i{position:absolute;inset:0 auto 0 0;border-radius:5px;background:var(--fill,var(--pos));transition:width .8s cubic-bezier(.2,.7,.2,1)}
-.bar s{position:absolute;top:-4px;bottom:-4px;left:75%;width:2px;background:var(--ink);text-decoration:none}
-.bar.lg{height:20px;border-radius:10px}.bar.lg i{border-radius:10px}
-.legend{display:flex;justify-content:space-between;font:400 11px var(--f-mono);color:var(--muted);margin-top:4px;position:relative}
-.legend .thr{position:absolute;left:75%;transform:translateX(-50%);color:var(--ink);font-weight:500}
+/* ---- result ---- */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--shadow)}
+.crow{display:grid;grid-template-columns:200px minmax(0,1fr) 64px;gap:14px;align-items:center;margin-top:14px}
+.crow .lbl{font-weight:600;font-size:14px} .crow .lbl small{display:block;font:400 12px var(--f-mono);color:var(--muted)}
+.crow .v{font:700 20px var(--f-display);text-align:right}
+@media (max-width:620px){.crow{grid-template-columns:minmax(0,1fr) 60px}.crow .bar{grid-column:1/-1;order:3}}
+.bar{position:relative;height:18px;border-radius:9px;background:var(--sunk)}
+.bar i{position:absolute;inset:0 auto 0 0;border-radius:9px;background:var(--fill,var(--pos));transition:width .9s cubic-bezier(.2,.7,.2,1)}
+.bar s{position:absolute;top:-4px;bottom:-4px;left:90%;width:2px;background:var(--ink)}
+.legend{position:relative;height:16px;font:400 11px var(--f-mono);color:var(--muted);margin-top:4px}
+.legend span{position:absolute;left:90%;transform:translateX(-50%);color:var(--ink)}
 
-.quote{font:500 19px/1.4 var(--f-display);max-width:46ch}
-.agent{display:flex;align-items:center;gap:9px}
-.av{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font:700 13px var(--f-mono);flex:none}
-.av.a{background:var(--a-soft);color:var(--a)} .av.b{background:var(--b-soft);color:var(--b)} .av.h{background:var(--green-soft);color:var(--green)} .av.r{background:var(--off-soft);color:var(--ink)}
-
-.found{display:flex;flex-direction:column;gap:8px}
-.frow{display:flex;gap:12px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface);cursor:pointer;text-align:left;width:100%}
-.frow:hover{border-color:var(--muted)}
-.frow .t{flex:1;font-weight:600;font-size:14px;min-width:0}
-.frow.drop{background:var(--bg);cursor:default}
-.frow.drop .t{font-weight:500;color:var(--muted);text-decoration:line-through}
-
-.group{display:flex;flex-direction:column;gap:8px;min-width:0;border-radius:12px;padding:12px;background:var(--bg)}
-.group h4{margin:0;font:600 12px var(--f-body)}
-.ev{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface);cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:3px}
-.ev:hover{border-color:var(--muted)}
-.ev .t{font-weight:600;font-size:13.5px}
-.ev .r{font-size:12.5px;color:var(--muted)}
-
-.rec{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
-.job{border:2px solid var(--b);background:var(--b-soft);border-radius:12px;padding:12px 16px;text-align:center;min-width:160px}
-.job b{display:block;font:600 19px var(--f-mono);color:var(--b)}
-.job small{font-size:12px;color:var(--muted)}
-.why{flex:1;min-width:220px;display:flex;flex-direction:column;gap:6px}
-.why p{font-size:15px}
-.ref{font:500 11.5px var(--f-mono);border:1px solid var(--line);background:var(--surface);padding:2px 6px;border-radius:6px;cursor:pointer;color:var(--ink)}
-.ref:hover{border-color:var(--green);color:var(--green)}
-
-.status{display:inline-flex;align-items:center;gap:8px;font-weight:600;padding:9px 14px;border-radius:10px}
-.status.ok{background:var(--pos-soft);color:var(--pos)} .status.no{background:var(--bad-soft);color:var(--bad)}
-.toast{background:var(--ink);color:#fff;border-radius:10px;padding:10px 14px;font-size:13.5px;align-self:flex-start}
-
-.big{font:700 44px/1 var(--f-display);font-variant-numeric:tabular-nums}
-.compare{display:flex;flex-direction:column;gap:14px}
-.crow{display:grid;grid-template-columns:150px minmax(0,1fr) 70px;gap:14px;align-items:center}
-.crow .lbl{font-weight:600;font-size:14px}
-.crow .lbl small{display:block;font:400 12px var(--f-mono);color:var(--muted)}
-.crow .v{font:700 18px var(--f-display);text-align:right;font-variant-numeric:tabular-nums}
-@media (max-width:560px){.crow{grid-template-columns:minmax(0,1fr) 60px}.crow .bar{grid-column:1/-1;order:3}}
-
-.field{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted)}
-.field input,.search input{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 11px}
-.search{display:flex;gap:8px}
-.search input{flex:1;min-width:0}
-
-table{border-collapse:collapse;width:100%;font-size:13.5px}
-th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
-th{font:500 10.5px var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:var(--bg);white-space:nowrap}
-tr:last-child td{border-bottom:0}
-tbody tr.click{cursor:pointer} tbody tr.click:hover{background:#FAFBF9}
-.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
-.toggle{display:inline-flex;background:var(--sunk);border:1px solid var(--line);border-radius:10px;padding:3px;gap:2px}
-.toggle button{border:0;background:transparent;padding:6px 14px;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;color:var(--muted)}
-.toggle button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
-
-.strip{position:sticky;bottom:0;margin-top:auto;background:var(--code-bg);color:var(--code-fg);border-radius:12px 12px 0 0;padding:8px 12px calc(8px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:4px;z-index:5;max-width:980px}
-.strip .hd{display:flex;align-items:center;gap:8px;font:600 10.5px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--code-k)}
-.strip .hd .live{width:7px;height:7px;border-radius:50%;background:var(--mint);animation:blink 1.6s ease-in-out infinite}
+/* ---- Atlas strip + detail drawer ---- */
+.strip{position:fixed;left:0;right:0;bottom:0;background:var(--code-bg);color:var(--code-fg);padding:8px max(16px,env(safe-area-inset-left,0px)) calc(8px + env(safe-area-inset-bottom,0px));z-index:5}
+.strip .in{max-width:1240px;margin:0 auto}
+.strip .hd{display:flex;gap:8px;align-items:center;font:600 10.5px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--code-k)}
+.strip .hd i{width:7px;height:7px;border-radius:50%;background:var(--mint);animation:blink 1.6s ease-in-out infinite}
+.strip .hd em{margin-left:auto;font-style:normal;color:var(--code-c);text-transform:none;letter-spacing:0;font-weight:400}
 @keyframes blink{50%{opacity:.35}}
-.strip .hd span.r{margin-left:auto;color:var(--code-c);text-transform:none;letter-spacing:0;font-weight:400}
-.lines{display:flex;flex-direction:column;gap:1px;max-height:66px;overflow:auto}
-.line{display:grid;grid-template-columns:62px minmax(0,1fr) auto;gap:10px;font:12px/1.6 var(--f-mono);border:0;background:transparent;color:inherit;text-align:left;padding:1px 4px;border-radius:5px;cursor:pointer}
+.lines{max-height:68px;overflow:auto;margin-top:3px}
+.line{display:grid;grid-template-columns:62px minmax(0,1fr) auto;gap:10px;font:12px/1.6 var(--f-mono);border:0;background:transparent;color:inherit;text-align:left;padding:1px 4px;border-radius:5px;cursor:pointer;width:100%}
 .line:hover{background:rgba(255,255,255,.07)}
 .line .tm{color:var(--code-c)} .line .ms{color:var(--code-n)}
 .line .d{overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .line .d b{color:var(--code-k);font-weight:500} .line .d b.c{color:var(--code-s)}
 .line.fresh{animation:flash 1.2s ease-out}
 @keyframes flash{from{background:rgba(127,216,172,.25)}to{background:transparent}}
 
-.insp{background:var(--surface);border-left:1px solid var(--line);position:sticky;top:0;height:100vh;overflow:auto;padding:24px 20px;padding-right:max(20px,env(safe-area-inset-right,0px))}
-@media (max-width:1180px){.insp{position:static;height:auto;border-left:0;border-top:1px solid var(--line);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}}
-.insp h2{margin:6px 0 10px}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(400px,100%);background:var(--surface);border-left:1px solid var(--line);box-shadow:-12px 0 32px rgba(19,32,26,.14);padding:22px 20px 90px;overflow:auto;z-index:8;transform:translateX(102%);transition:transform .25s}
+.drawer.open{transform:none}
+.drawer h2{font:700 18px/1.25 var(--f-display);margin:6px 0 10px}
+.drawer .x{position:absolute;top:12px;right:12px;border:0;background:var(--sunk);border-radius:8px;width:30px;height:30px;cursor:pointer}
 .isec{display:flex;flex-direction:column;gap:6px;padding-block:12px;border-top:1px solid var(--line)}
 .isec h4{margin:0;font:500 10.5px var(--f-mono);letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
 .kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 14px;margin:0;font-size:13px}
-.kv dt{color:var(--muted)} .kv dd{margin:0;font-family:var(--f-mono);font-size:12.5px;overflow-wrap:anywhere}
+.kv dt{color:var(--muted)} .kv dd{margin:0;font:12.5px var(--f-mono);overflow-wrap:anywhere}
 pre.code{background:var(--code-bg);color:var(--code-fg);font:12px/1.55 var(--f-mono);padding:10px 12px;border-radius:10px;overflow-x:auto;margin:0}
-.k{color:var(--code-k)}.s{color:var(--code-s)}.n{color:var(--code-n)}
-.hist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;font-size:13px}
-.hist li{display:grid;grid-template-columns:58px minmax(0,1fr);gap:8px}
-.hist .w{font:400 11.5px var(--f-mono);color:var(--muted);padding-top:1px}
-.vers{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.ver{border:1px solid var(--line);border-radius:10px;padding:10px;font-size:12.5px;display:flex;flex-direction:column;gap:4px}
-.ver.cur{border-color:var(--green)}
-
-/* embedded terminal + experiment highlight */
-.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:14px;align-items:start}
-@media (max-width:1100px){.split{grid-template-columns:minmax(0,1fr)}}
-.term{background:var(--code-bg);color:var(--code-fg);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;min-width:0;box-shadow:var(--shadow)}
-.term .bar-t{display:flex;align-items:center;gap:7px;padding:9px 12px;background:#0A1A14;font:500 11.5px var(--f-mono);color:var(--code-c)}
-.term .bar-t i{width:10px;height:10px;border-radius:50%;background:#2E4A3E;display:inline-block}
-.term .bar-t span{margin-left:6px}
-.term .body{padding:12px 14px;font:12.5px/1.65 var(--f-mono);max-height:420px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}
-.term .you{color:#9EE6C2}.term .you::before{content:"> ";color:var(--mint)}
-.term .cl::before{content:"⏺ ";color:#E8C08A}
-.term .tool{color:var(--code-c)}.term .tool::before{content:"  ⎿ "}
-.term .out{color:#C9D7D0}.term .good{color:#7FD8AC}.term .badv{color:#F2A27C}
-.term .inrow{display:flex;gap:8px;padding:10px 12px;border-top:1px solid #1E3A2F;align-items:center}
-.term .inrow b{color:var(--mint);font:600 13px var(--f-mono)}
-.term .inrow input{flex:1;min-width:0;background:transparent;border:0;color:#E4F1EA;font:12.5px var(--f-mono);outline:none}
-.term .inrow button{border:1px solid var(--mint);background:transparent;color:var(--mint);border-radius:7px;padding:5px 10px;font:600 12px var(--f-body);cursor:pointer}
-.term .inrow button:hover{background:rgba(95,211,154,.12)}
-.term .inrow button.no{border-color:#F2A27C;color:#F2A27C}
-.xlist{display:flex;flex-direction:column;gap:8px}
-.xrow{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface);cursor:pointer;text-align:left;width:100%;transition:border-color .3s,background .3s,box-shadow .3s}
-.xrow:hover{border-color:var(--muted)}
-.xrow .t{flex:1;min-width:0;font-weight:600;font-size:13.5px}
-.xrow .t small{display:block;font-weight:400;color:var(--muted);font-size:12px}
-.xrow.use{border-color:var(--green);background:#F2FAF5;box-shadow:0 0 0 2px var(--green-soft)}
-.xrow.avoid{border-color:#E8B79B;background:#FDF6F2}
-.xrow.nofit{opacity:.7}
-.xrow.new{border-color:var(--b);box-shadow:0 0 0 2px var(--b-soft)}
-
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 
-<div class="app">
-  <aside class="side">
-    <div class="brand">
-      <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect width="30" height="30" rx="8" fill="#134A39"/><circle cx="10" cy="10" r="3.2" fill="#E5A25A"/><circle cx="21" cy="15" r="3.2" fill="#9EA1F5"/><circle cx="10" cy="20" r="3.2" fill="#5FD39A"/><path d="M12.8 11.4 18.3 13.8M12.8 18.6l5.5-2.4" stroke="#9CC0AF" stroke-width="1.5"/></svg>
-      <div><b>Precedent</b><small>research memory for agents</small></div>
-    </div>
-    <nav class="nav" aria-label="Main">
-      <button data-page="demo" aria-current="page"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 4.5v11l9-5.5z"/></svg>Demo</button>
-      <button data-page="research"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="9" cy="9" r="5"/><path d="m13 13 4 4"/></svg>Research</button>
-      <button data-page="governance"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M10 2.5 4 5v5c0 3.6 2.6 6.4 6 7.5 3.4-1.1 6-3.9 6-7.5V5z"/></svg>Governance</button>
-      <button data-page="settings"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10" cy="10" r="2.6"/><path d="M10 2.5v2.2M10 15.3v2.2M2.5 10h2.2M15.3 10h2.2M4.7 4.7l1.6 1.6M13.7 13.7l1.6 1.6M4.7 15.3l1.6-1.6M13.7 6.3l1.6-1.6"/></svg>Settings</button>
-    </nav>
-    <div class="side-foot">
-      <div class="atlas-pill"><span class="dot"></span><div>MongoDB Atlas<small>connected · vision-research</small></div></div>
-      <div class="mockflag">Mockup · simulated numbers and terminal</div>
-    </div>
-  </aside>
-
-  <div class="work">
-    <main class="page" id="page"></main>
-    <section class="strip" aria-label="Atlas activity">
-      <div class="hd"><span class="live"></span>Atlas activity<span class="r">live · click a line for details</span></div>
-      <div class="lines" id="lines"></div>
-    </section>
+<header class="top">
+  <div class="brand">
+    <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect width="30" height="30" rx="8" fill="#134A39"/><circle cx="10" cy="10" r="3.2" fill="#E5A25A"/><circle cx="21" cy="15" r="3.2" fill="#9EA1F5"/><circle cx="10" cy="20" r="3.2" fill="#5FD39A"/></svg>
+    <div><b>Precedent</b><small>research memory for agents</small></div>
   </div>
+  <nav class="steps" aria-label="Demo stages"><ol id="steps"></ol></nav>
+  <div><div class="pill"><i></i>MongoDB Atlas · connected</div><div class="mock" style="margin-top:4px;text-align:right">Mockup · numbers are illustrative</div></div>
+</header>
 
-  <aside class="insp" id="insp" aria-label="Details" aria-live="polite"></aside>
-</div>
+<main class="stage" id="stage"></main>
+
+<section class="strip" aria-label="Atlas activity"><div class="in">
+  <div class="hd"><i></i>Atlas activity<em>real commands as they run · click a line</em></div>
+  <div class="lines" id="lines"></div>
+</div></section>
+<aside class="drawer" id="drawer" aria-label="Details" aria-live="polite"></aside>
 
 <script>
-/* ---------- mockup data: ResNet-50 on ImageNet; Claude Code works through the embedded terminal ---------- */
-const TARGET = 0.75;
-const BASELINE = {id:'baseline',label:'Claude Code on its own',job:'scratch',acc:.41,gpu:8,outside:true};
-const JOBS = {
-  'warm-start':{label:'Retrain from stored weights',acc:.763,gpu:0.6},
-  'scratch':{label:'Train from scratch',acc:.41,gpu:8},
-};
-const TASK = {dataset:'ImageNet-1k (1,000 classes)',model:'ResNet-50',image:'224 px'};
+/* ---------- the task and the data (mockup). The same shapes are what the platform stores. ---------- */
+const TARGET = 0.90;
+const TASK = {dataset:'CIFAR-10 (10 classes)', model:'ResNet-18', image:'32 px', budget:'2 GPU-minutes, one run'};
+const BASELINE = {label:'Claude Code on its own', sub:'trains from scratch · lr 0.1 · 3 epochs', acc:.712, secs:68};
+const WARM = {label:'Claude Code with Precedent', sub:'fine-tunes stored weights · lr 0.01 · 3 epochs', acc:.931, secs:64};
 const SEED = [
-  {key:'ckpt',id:'7f3a9c12',agent:'vision-agent-1',team:'Vision team',title:'ResNet-50 reached 76.1% on ImageNet',dataset:TASK.dataset,model:'ResNet-50',image:'224 px',
-    settings:'90 epochs · learning rate 0.1 with warmup · batch 256',acc:.761,gpu:'≈ 200 GPU-hours',dir:'positive',exec:'completed',score:.88,
-    weights:{file:'resnet50_in1k_v1.pt',size:'98 MB',src:'torchvision package · ResNet50_Weights.IMAGENET1K_V1',id:'6731…b2e0'}},
-  {key:'fastlr',id:'b21e07d4',agent:'vision-agent-2',team:'Vision team',title:'High learning rate without warmup collapsed',dataset:TASK.dataset,model:'ResNet-50',image:'224 px',
-    settings:'learning rate 0.8 · no warmup · batch 256',acc:.094,gpu:'8 GPU-hours',dir:'negative',exec:'completed',score:.84},
-  {key:'cifar',id:'c94f5a61',agent:'robotics-agent',team:'Robotics lab',title:'ResNet-50 reached 95% on CIFAR-10',dataset:'CIFAR-10 (10 classes)',model:'ResNet-50',image:'32 px',
-    settings:'200 epochs · tiny 32 px images',acc:.952,gpu:'≈ 6 GPU-hours',dir:'positive',exec:'completed',score:.81,weights:{file:'resnet50_cifar10.pt',size:'94 MB',src:'trained by robotics-agent',id:'6731…9c41'}},
-  {key:'crash',id:'e05d8b33',agent:'eval-agent',team:'Platform team',title:'Batch-2048 run crashed',dataset:TASK.dataset,model:'ResNet-50',image:'224 px',
-    settings:'batch 2048 on one GPU',acc:null,gpu:'—',dir:'undetermined',exec:'crashed',error:'Out of GPU memory in the first step. Nothing was measured.'},
-  {key:'paper',id:'a8d14e70',agent:'ResNet paper',team:'Imported · He et al., 2015',title:'Deeper networks without shortcuts got worse',dataset:TASK.dataset,model:'Plain CNN',image:'224 px',
-    settings:'plain 18 vs 34 layers',acc:null,accText:'27.94% → 28.54% error',gpu:'—',dir:'negative',exec:'completed',background:true},
+  {key:'ckpt', id:'7f3a9c12', agent:'vision-agent-1', title:'ResNet-18 fine-tuned from ImageNet weights reached 93.4% on CIFAR-10',
+   dataset:TASK.dataset, model:'ResNet-18', image:'32 px', settings:'start from ResNet18_Weights.IMAGENET1K_V1 · SGD lr 0.01 · 3 epochs · batch 128',
+   acc:.934, secs:'≈ 70 s', dir:'positive', exec:'completed',
+   cmd:'python -m benchmark.run --job finetune-lr0.01 --dataset cifar10',
+   weights:{file:'resnet18_cifar10_ft.pt', size:'43 MB', src:'trained by vision-agent-1, stored in GridFS'}},
+  {key:'fastlr', id:'b21e07d4', agent:'vision-agent-2', title:'Training from scratch with learning rate 0.4 diverged',
+   dataset:TASK.dataset, model:'ResNet-18', image:'32 px', settings:'random init · SGD lr 0.4 · no warmup · 3 epochs',
+   acc:.100, secs:'≈ 65 s', dir:'negative', exec:'completed', cmd:'python -m benchmark.run --job scratch-lr0.4 --dataset cifar10'},
+  {key:'fmnist', id:'c94f5a61', agent:'robotics-agent', title:'ResNet-18 reached 94.8% on Fashion-MNIST',
+   dataset:'Fashion-MNIST (grayscale)', model:'ResNet-18', image:'28 px', settings:'random init · lr 0.05 · 5 epochs',
+   acc:.948, secs:'≈ 60 s', dir:'positive', exec:'completed', cmd:'python -m benchmark.run --job scratch-lr0.05 --dataset fashion-mnist'},
+  {key:'crash', id:'e05d8b33', agent:'eval-agent', title:'Batch-4096 run crashed',
+   dataset:TASK.dataset, model:'ResNet-18', image:'32 px', settings:'batch 4096 on one GPU',
+   acc:null, secs:'—', dir:'undetermined', exec:'crashed', error:'Out of GPU memory in the first step. Nothing was measured, so this is not evidence against anything.'},
+  {key:'paper', id:'a8d14e70', agent:'ResNet paper (imported)', title:'Shortcut connections let deeper networks train better',
+   dataset:'ImageNet (1,000 classes)', model:'ResNet / plain CNN', image:'224 px', settings:'He et al., 2015 · 34-layer plain 28.54% vs residual 25.03% error',
+   acc:null, secs:'—', dir:'positive', exec:'completed', background:true},
 ];
-const CORRECTION = {title:'ResNet-50 record pointed at 100-class weights',dataset:'ImageNet-100 (100 classes)',reason:'The weights file linked to this record was a 100-class fine-tune, not the 1,000-class model'};
-const STAGES = ['Past experiments','Claude Code gathers evidence','You decide what to run','Claude Code retrains','Governance','What changed'];
-const PROMPT1 = 'Build on what’s known about training ResNet-50 on ImageNet. Target 75%, budget 8 GPU-hours. Show me which past experiments you’d use.';
+const STAGES = ['Past experiments','Ask Claude Code','You decide','Result'];
+const PROMPT = 'Build on what past agents learned about training ResNet-18 on CIFAR-10. Target 90%, one run, 2 GPU-minutes. Which experiments would you use?';
+const CALLOUT = [
+  'Each experiment is one document. The weights files sit in GridFS, and new experiments stream in through a change stream.',
+  'search_experiments is one Atlas aggregate: $vectorSearch inside this project, a $lookup that keeps only the live version, and the fit labels computed in the database.',
+  'Claude Code’s plan is stored as pending. Your confirmation is one atomic update, so it can run exactly once.',
+  'Cited versions are re-checked, the weights stream from GridFS, and the new experiment is inserted and pushed to this screen by a change stream.',
+];
 
+/* ---------- state ---------- */
 let clock = new Date(Date.UTC(2026,10,14,18,38,0));
 const tick = s => { clock = new Date(clock.getTime()+s*1000); return clock.toISOString().slice(11,19); };
-const now = () => clock.toISOString().slice(11,19);
-const S = {page:'demo',stage:1,findings:{},order:[],events:[],search:null,decision:null,receipts:[],sel:null,toast:null,q:'',isolation:false,n:0,term:[],context:null,busy:false,pending:null};
-const pct = x => (Math.round(x*1000)/10)+'%';
+const S = {stage:0, marks:{}, ex:SEED.map(f=>({...f,version:1})), events:[], term:[], busy:false, planned:false, result:null, fresh:null, sel:null, ev:null};
 const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const refOf = f => `${f.id}·v${f.version}`;
+const pct = x => (Math.round(x*1000)/10)+'%';
 const wait = ms => new Promise(r=>setTimeout(r,matchMedia('(prefers-reduced-motion: reduce)').matches?0:ms));
-const fits = f => f.dataset===TASK.dataset && f.model==='ResNet-50' && f.image===TASK.image;
+const $ = id => document.getElementById(id);
 
-/* ---------- Atlas activity ---------- */
-function log(op,coll,detail,o={}){
-  S.events.push({t:tick(o.dt??.4),op,coll,detail,ms:o.ms??null,docs:o.docs??null,shape:o.shape||null,change:!!o.change,fresh:true});
-  renderStrip();
-}
+function log(op,coll,detail,o={}){ S.events.push({t:tick(o.dt??.4),op,coll,detail,ms:o.ms??null,shape:o.shape||null,change:!!o.change,fresh:true}); renderStrip(); }
 const chg = (coll,detail) => log('change stream',coll,detail,{change:true,dt:.1});
 function renderStrip(){
-  const el=document.getElementById('lines'), ev=S.events.slice(-30), off=S.events.length-ev.length;
-  el.innerHTML=ev.map((e,i)=>`<button class="line${e.fresh?' fresh':''}" data-ev="${off+i}"><span class="tm">${e.t}</span><span class="d"><b class="${e.change?'c':''}">${esc(e.op)}</b> ${esc(e.coll)} · ${esc(e.detail)}</span><span class="ms">${e.ms!=null?e.ms+' ms':''}</span></button>`).join('');
-  S.events.forEach(e=>e.fresh=false); el.scrollTop=el.scrollHeight;
+  const ev=S.events.slice(-30), off=S.events.length-ev.length;
+  $('lines').innerHTML = ev.map((e,i)=>`<button class="line${e.fresh?' fresh':''}" data-ev="${off+i}"><span class="tm">${e.t}</span><span class="d"><b class="${e.change?'c':''}">${esc(e.op)}</b> ${esc(e.coll)} · ${esc(e.detail)}</span><span class="ms">${e.ms!=null?e.ms+' ms':''}</span></button>`).join('')
+    || '<div class="muted" style="font:12px var(--f-mono);padding:2px 4px">waiting for the first command…</div>';
+  S.events.forEach(e=>e.fresh=false); $('lines').scrollTop=1e6;
 }
 
 /* ---------- terminal ---------- */
-const say = (cls,text) => S.term.push({cls,text});
-async function stream(lines,ms=380){ for(const [c,t] of lines){ say(c,t); renderTerm(); await wait(ms); } }
-function renderTerm(){ const b=document.getElementById('tbody'); if(!b) return; b.innerHTML=termLines(); b.scrollTop=b.scrollHeight; }
-const termLines = () => S.term.map(l=>`<div class="${l.cls}">${l.text}</div>`).join('') || '<div class="tool" style="padding-left:0">Claude Code is connected to Precedent through MCP. Type a request below.</div>';
-function terminal(input){
+const say = (cls,text) => { S.term.push({cls,text}); renderTerm(); };
+const termHTML = () => S.term.map(l=>`<div class="${l.cls}">${l.text}</div>`).join('') || '<div class="dim">Claude Code is connected to Precedent through MCP (6 tools). Ask it something.</div>';
+function renderTerm(){ const b=$('tbody'); if(!b) return; b.innerHTML=termHTML(); b.scrollTop=1e6; }
+async function lines(list,ms=420){ for(const [c,t] of list){ say(c,t); await wait(ms); } }
+
+/* ---------- what the MCP tools do ---------- */
+async function askClaude(){
+  S.busy=true; render();
+  say('you', esc(PROMPT)); await wait(500);
+  await lines([['cl','I’ll search the shared memory for this task first.'],['tool','search_experiments("ResNet-18 on CIFAR-10, 90% target, 2 GPU-minutes", conditions: CIFAR-10 · ResNet-18 · 32 px)']]);
+  log('aggregate','result_vectors','$vectorSearch (project filter) + $lookup + fit labels · 4 docs',{ms:38,shape:'aggregate result_vectors\n  $vectorSearch { filter: { project_id: "vision-research" }, queryVector: [1536 floats] }\n  $lookup results { live version, not expired, completed }\n  $set applicability { cohort, dataset, input size }'});
+  S.marks={ckpt:'use',fastlr:'avoid',fmnist:'nofit',paper:'nofit',crash:'hidden'}; render();
+  await lines([
+    ['tool','4 candidates · the crashed run was not returned'],
+    ['cl','Here’s how I read them:'],
+    ['good','  USE    7f3a9c12 v1 · fine-tuning from ImageNet weights reached 93.4% on this exact task'],
+    ['badv','  AVOID  b21e07d4 v1 · from scratch at lr 0.4 diverged on this same task'],
+    ['dim','  SKIP   c94f5a61 · Fashion-MNIST, 28 px grayscale: doesn’t fit (dataset, input size)'],
+    ['dim','  SKIP   a8d14e70 · the ResNet paper’s ImageNet result: background only'],
+    ['cl','Plan: fine-tune the stored ResNet-18 weights at lr 0.01 for 3 epochs, which should fit the 2-minute budget.'],
+    ['tool','propose_plan(job: "finetune-lr0.01", used: [7f3a9c12 v1], avoided: [b21e07d4 v1], set_aside: [c94f5a61, a8d14e70])'],
+  ]);
+  log('insert','decisions','plan stored · status pending',{ms:6}); chg('decisions','insert · pending');
+  S.stage=2; S.planned=true; S.busy=false; render();
+}
+async function decide(yes){
+  S.busy=true; render();
+  if(!yes){
+    say('you','Not now.'); await wait(350);
+    log('update','decisions','pending → rejected (conditional update)',{ms:5}); chg('decisions','update · rejected');
+    say('cl','Understood. Nothing was run and no GPU time was used. Tell me what to change, or ask me to try again.');
+    S.planned=false; S.busy=false; S.stage=1; S.marks={}; render(); return;
+  }
+  say('you','Run it.'); await wait(350);
+  log('update','decisions','pending → approved, exactly once (findOneAndUpdate)',{ms:6}); chg('decisions','update · approved');
+  S.stage=3; render();
+  await lines([['cl','Running the approved plan.'],
+    ['tool','run_plan(decision) · cited versions re-checked: all current'],
+    ['tool','load_weights(7f3a9c12 v1) · resnet18_cifar10_ft.pt · 43 MB from GridFS']],500);
+  log('find','results','re-check cited versions · all live',{ms:4});
+  log('find','fs.chunks','stream resnet18_cifar10_ft.pt',{ms:210});
+  for(const e of ['epoch 1/3 · loss 0.61 · val 88.7%','epoch 2/3 · loss 0.33 · val 92.2%','epoch 3/3 · loss 0.21 · val 93.1%']){ say('dim',e); await wait(650); }
+  say('good','Done in 64 s · test accuracy 93.1% (target 90%)');
+  await lines([['tool','publish_result(decision, accuracy 93.1%, weights resnet18_cifar10_ft_v2.pt)']],450);
+  log('insert','results','new experiment · cites 7f3a9c12 v1',{ms:12}); chg('results','insert · new experiment');
+  S.ex.push({key:'new',id:'d2c6f801',agent:'claude-code (you)',title:'ResNet-18 fine-tuned again reached 93.1% in 64 s',dataset:TASK.dataset,model:'ResNet-18',image:'32 px',
+    settings:'start from 7f3a9c12 v1 weights · SGD lr 0.01 · 3 epochs · batch 128',acc:.931,secs:'64 s',dir:'positive',exec:'completed',version:1,
+    cmd:'python -m benchmark.run --job finetune-lr0.01 --dataset cifar10',weights:{file:'resnet18_cifar10_ft_v2.pt',size:'43 MB',src:'trained just now, stored in GridFS'}});
+  S.fresh='new'; S.result=true; S.busy=false; render();
+  say('cl','Saved as a new experiment. The next agent can build on it.');
+}
+function reset(){ S.stage=0;S.marks={};S.term=[];S.planned=false;S.result=null;S.fresh=null;S.ex=SEED.map(f=>({...f,version:1}));S.events=[];render();renderStrip(); }
+
+/* ---------- views ---------- */
+const labelOf = f => f.exec==='crashed' ? ['c-bad','Crashed · no result'] : f.background ? ['c-off','Imported paper'] : f.dir==='positive' ? ['c-pos','Worked'] : ['c-neg','Failed'];
+function xrow(f){
+  const m = S.marks[f.key]||'', [c,l] = labelOf(f);
+  const tag = m==='use'?['c-g','Using']:m==='avoid'?['c-neg','Avoiding']:m==='nofit'?['c-off','Doesn’t fit']:m==='hidden'?['c-bad','Never offered']:null;
+  const cls = m==='hidden'?'nofit':m, extra = f.key===S.fresh?' new':'';
+  return `<button class="xrow ${cls}${extra}" data-x="${f.key}"><span class="chip ${c}">${l}</span><span class="t">${esc(f.title)}<small>${esc(f.agent)} · ${esc(f.dataset)} · ${f.acc!=null?pct(f.acc):'no measurement'}</small></span>${tag?`<span class="chip ${tag[0]}">${tag[1]}</span>`:''}${f.weights?'<span class="chip c-b">weights</span>':''}</button>`;
+}
+function termBox(){
+  let inp;
+  if(S.stage===0) inp=`<button type="button" id="go" ${S.busy?'disabled':''}>Ask Claude Code</button>`;
+  else if(S.stage===1) inp=`<button type="submit" ${S.busy?'disabled':''}>Send</button>`;
+  else if(S.stage===2) inp=`<button type="button" id="yes" ${S.busy?'disabled':''}>Run it</button><button type="button" class="no" id="no" ${S.busy?'disabled':''}>Not now</button>`;
+  else inp='';
+  const placeholder = S.stage<=1 ? PROMPT : S.stage===2 ? 'Claude Code is asking: run this plan?' : '';
   return `<div class="term" role="region" aria-label="Embedded terminal"><div class="bar-t"><i></i><i></i><i></i><span>claude · ~/vision-research · MCP: precedent</span></div>
-    <div class="body" id="tbody">${termLines()}</div>
-    ${input?`<form class="inrow" id="tform"><b>›</b><input id="tin" value="${esc(input.value)}" aria-label="Message to Claude Code" ${S.busy?'disabled':''}><button type="submit" ${S.busy?'disabled':''}>${input.send||'Send'}</button>${input.no?`<button type="button" class="no" data-act="${input.no.act}" ${S.busy?'disabled':''}>${input.no.label}</button>`:''}</form>`:''}</div>`;
+    <div class="body" id="tbody">${termHTML()}</div>
+    <form class="inrow" id="tform" ${S.stage>=3?'hidden':''}><b>›</b><input value="${S.stage<=1&&!S.busy?esc(placeholder):''}" placeholder="${esc(placeholder)}" aria-label="Message to Claude Code" ${S.busy||S.stage>=2?'disabled':''}>${inp}</form></div>`;
 }
-
-/* ---------- platform actions (what the MCP tools do) ---------- */
-async function runAgents(animate){
-  S.findings={};S.order=[];
-  for(const s of SEED){
-    if(animate) await wait(400);
-    const f={...s,version:1,status:'current',published:tick(.6),history:[]};
-    f.history.push({v:1,at:f.published,actor:f.agent,action:'published'});
-    S.findings[s.key]=f;S.order.push(s.key);
-    log('insert','results',`${f.agent}: ${f.title}`,{ms:9+S.order.length*2,docs:1,shape:{insert:'results',documents:[{_id:f.id,project_id:'vision-research',author:f.agent,version:1,conditions:{dataset:f.dataset,model:f.model,image:f.image},settings:f.settings,execution:f.exec,direction:f.dir,weights:f.weights?f.weights.file:null}]}});
-    if(f.weights) log('GridFS upload','fs.chunks',`${f.weights.file} · ${f.weights.size}`,{ms:420+S.order.length*30,docs:392,dt:.2});
-    if(f.exec==='completed'&&!f.background) log('insert','result_vectors',`search vector for ${f.id}`,{ms:7,docs:1,dt:.1});
-    chg('results','new experiment shown on screen');
-    if(animate) render();
-  }
+function resultCard(){
+  const row=(r,fill)=>`<div class="crow"><div class="lbl">${r.label}<small>${r.sub}</small></div><div class="bar"><i style="width:${r.acc*100}%;--fill:${fill}"></i><s></s></div><div class="v">${pct(r.acc)}</div></div>`;
+  return `<section class="card"><div class="panel-h">Same request, same budget, different decision</div>
+    ${row(BASELINE,'var(--off)')}${row(WARM,'var(--pos)')}
+    <div class="legend"><span>target 90%</span></div>
+    <p style="margin-top:12px;font-size:14.5px">With the memory, Claude Code skipped the dead end and started from stored weights: <b>${pct(WARM.acc)}</b> in ${WARM.secs} s, against <b>${pct(BASELINE.acc)}</b> when it started from nothing.</p>
+    <p class="muted" style="margin-top:6px;font-size:13px">Next phase: correct or expire a finding and ask again, and watch the plan change. <button class="btn ghost" id="again" style="margin-left:8px;padding:5px 11px">Replay the demo</button></p></section>`;
 }
-function search(){
-  const hits=[],dropped=[];
-  for(const k of S.order){const f=S.findings[k];
-    if(f.exec!=='completed'||f.background||f.mine) continue;
-    if(k==='ckpt'&&f.version===2){dropped.push({f,why:'old version, now corrected'});hits.push(f);continue}
-    if(f.status==='expired'){dropped.push({f,why:'expired'});continue}
-    hits.push(f);}
-  log('aggregate','result_vectors',`MCP search_experiments → $vectorSearch in vision-research + live-record check · ${hits.length} kept${dropped.length?`, ${dropped.length} dropped`:''}`,{ms:36+Math.round(Math.random()*8),docs:hits.length,shape:PIPE});
-  const use=hits.filter(f=>fits(f)&&f.dir==='positive'&&f.weights), avoid=hits.filter(f=>fits(f)&&f.dir==='negative'), nofit=hits.filter(f=>!fits(f));
-  return {use,avoid,nofit,dropped};
-}
-function propose(ctx){
-  const d={id:'d-'+(++S.n),status:'pending',ctx,gov:gov()};
-  d.job=ctx.use.length?'warm-start':'scratch';
-  d.used=[...ctx.use,...ctx.avoid];
-  tick(1);
-  log('insert','decisions',`plan ${d.id}: ${JOBS[d.job].label} · waiting for you`,{ms:8,docs:1,shape:{insert:'decisions',documents:[{_id:d.id,status:'pending',job:d.job,used_refs:d.used.map(f=>({result_id:f.id,version:f.version}))}]}});
-  log('update','decisions',`context: ${ctx.use.length} used, ${ctx.avoid.length} avoided, ${ctx.nofit.length} set aside`,{ms:5,docs:1,dt:.1});
-  chg('decisions','experiments highlighted on screen');
-  S.decision=d;return d;
-}
-const gov = () => ({corrected:S.findings.ckpt?.version===2,expired:S.findings.fastlr?.status==='expired'});
-function labelFor(d){return d.gov.corrected&&d.gov.expired?'After correction + expiry':d.gov.corrected?'After correction':d.gov.expired?'After expiry':'With Precedent'}
-
-async function askClaude(text){
-  S.busy=true; say('you',esc(text)); render(); await wait(300);
-  S.context=search(); const c=S.context;
-  await stream([['cl','precedent.search_experiments("ResNet-50 ImageNet, 75% target, 8 GPU-hours")'],
-    ['tool',`${c.use.length+c.avoid.length+c.nofit.length} experiments returned${c.dropped.length?` · ${c.dropped.length} left out (${c.dropped.map(x=>x.why).join(', ')})`:''} · crashed runs never returned`]]);
-  const d=propose(c); render();
-  const lines=[];
-  c.use.forEach(f=>lines.push(['cl',`Using <span class="good">${f.id}</span> “${esc(f.title)}”. Weights: ${f.weights.src}.`]));
-  c.avoid.forEach(f=>lines.push(['cl',`Avoiding <span class="badv">${f.id}</span>: ${esc(f.title).toLowerCase()}.`]));
-  c.nofit.forEach(f=>lines.push(['cl',`Setting aside ${f.id}: ${f.version>1?'now recorded as 100-class weights':'trained on '+esc(f.dataset.split(' (')[0])+', '+f.image+' images'}, doesn’t fit this task.`]));
-  if(!c.use.length&&!c.avoid.length&&!c.nofit.length) lines.push(['cl','No past experiments fit this task.']);
-  lines.push(['cl',d.job==='warm-start'?'Suggestion: retrain from those weights, last layers only, learning rate 0.001. Want me to run it?':'No usable weights fit this task. Suggestion: train from scratch with warmup. Want me to run it?']);
-  await stream(lines,420);
-  S.busy=false; S.pending='decide'; render();
-}
-async function runPlan(text){
-  const d=S.decision; if(!d||d.status!=='pending') return;
-  S.busy=true; say('you',esc(text)); render(); await wait(250);
-  log('findOneAndUpdate','decisions',`approve ${d.id} only if still pending · matched 1`,{ms:6,docs:1,shape:{findAndModify:'decisions',query:{_id:d.id,status:'pending'},update:{$set:{status:'approved',decided_by:'you'}}}});
-  d.status='approved';
-  const j=JOBS[d.job], lines=[];
-  if(d.used.length) log('find','results',`resolve: ${d.used.length} cited experiment${d.used.length>1?'s':''} still current`,{ms:5,docs:d.used.length});
-  if(d.job==='warm-start'){
-    log('GridFS download','fs.chunks','MCP load_weights → resnet50_in1k_v1.pt · 98 MB',{ms:860,docs:392});
-    lines.push(['cl','precedent.load_weights("7f3a9c12")'],['tool','resnet50_in1k_v1.pt · 98 MB · sha256 verified'],
-      ['cl','python train.py --init weights/resnet50_in1k_v1.pt --freeze backbone --lr 0.001 --budget-hours 8'],
-      ['out','epoch 1/1 · loss 1.02 · val accuracy 74.9%'],['out','fine-tune last block · val accuracy <span class="good">76.3%</span> · 0.6 GPU-hours']);
-  } else {
-    lines.push(['cl','python train.py --init random --lr 0.1 --warmup 5 --budget-hours 8'],['out','epoch 1/90 · val accuracy 8.2%'],['out','epoch 4/90 · budget used up · val accuracy <span class="badv">41.0%</span> · 8 GPU-hours']);
-  }
-  await stream(lines,520);
-  const r={id:'r-'+d.id,d,job:d.job,acc:j.acc,gpu:j.gpu,label:labelFor(d),cited:d.used.map(refOf)};
-  d.status='executed';d.receipt=r;S.receipts=S.receipts.filter(x=>x.label!==r.label);S.receipts.push(r);
-  const nf={key:'mine'+S.n,id:Math.random().toString(16).slice(2,10),agent:'you + Claude Code',team:'Your session',title:`${j.label}: ${pct(j.acc)} (${r.label.toLowerCase()})`,dataset:TASK.dataset,model:'ResNet-50',image:'224 px',
-    settings:d.job==='warm-start'?'from 7f3a9c12 weights · last layers · lr 0.001':'random init · lr 0.1 · warmup 5',acc:j.acc,gpu:j.gpu+' GPU-hours',dir:j.acc>=TARGET?'positive':'negative',exec:'completed',mine:true,version:1,status:'current',published:now(),history:[{v:1,at:now(),actor:'you + Claude Code',action:'published'}]};
-  S.findings[nf.key]=nf;S.order.push(nf.key);S.lastNew=nf.key;
-  log('insert','results',`MCP publish_result → ${nf.title}`,{ms:10,docs:1});
-  chg('results','new experiment shown on screen');
-  await stream([['cl','precedent.publish_result(...)'],['tool',`saved as ${nf.id}, cites ${r.cited.join(', ')||'nothing'}`]],350);
-  S.busy=false; S.pending=null; render();
-}
-async function notNow(){
-  const d=S.decision; if(!d||d.status!=='pending') return;
-  say('you','Not now.');
-  log('findOneAndUpdate','decisions',`reject ${d.id} · matched 1 · nothing runs`,{ms:6,docs:1});
-  d.status='rejected'; say('cl','Okay. Nothing was run. The plan is saved as rejected.'); S.pending=null; render();
-}
-function correct(reason){
-  const f=S.findings.ckpt; if(f.version!==1) return;
-  log('transaction','results',`correct ${f.id}: keep v1 in history, make v2 current`,{ms:21,docs:3,shape:{transaction:[{insert:'result_versions',doc:{result_id:f.id,version:1}},{update:'results',q:{_id:f.id,version:1},u:{$set:{version:2,'conditions.dataset':CORRECTION.dataset}}},{insert:'result_vectors',doc:{result_id:f.id,version:2}}]}});
-  chg('results','correction shown on screen');
-  f.history.push({v:2,at:now(),actor:'researcher',action:'corrected',reason,prev:{title:f.title,dataset:f.dataset}});
-  Object.assign(f,{version:2,title:CORRECTION.title,dataset:CORRECTION.dataset});
-}
-function expire(key,reason){
-  const f=S.findings[key]; if(!f||f.status!=='current') return;
-  f.expiredAt=tick(1);
-  log('update','results',`expire ${f.id}: expires_at = now`,{ms:6,docs:1,shape:{update:'results',q:{_id:f.id,project_id:'vision-research'},u:{$set:{expires_at:'$$NOW'}}}});
-  chg('results','expiry shown on screen');
-  f.status='expired';f.history.push({v:f.version,at:f.expiredAt,actor:'researcher',action:'expired',reason});
-}
-const PIPE=[{$vectorSearch:{index:'research_memory_v1',path:'embedding',queryVector:'[1536 floats]',filter:{project_id:'vision-research'},limit:12}},{$lookup:{from:'results',as:'live',pipeline:[{$match:{same_version:true,expires_at:{$gt:'$$NOW'},execution:'completed'}}]}},{$unwind:'$live'},{$addFields:{fits:'dataset, model and image size match the task'}}];
-
-/* ---------- UI pieces ---------- */
-function label(f){
-  if(f.exec!=='completed') return '<span class="chip c-bad">Crashed, not evidence</span>';
-  return (f.dir==='positive'?'<span class="chip c-pos">Worked</span>':'<span class="chip c-neg">Didn’t work</span>')+(f.status==='expired'?' <span class="chip c-bad">Expired</span>':f.version>1?' <span class="chip c-b">Corrected</span>':'');
-}
-function bar(x,lg){if(x==null)return `<div class="bar${lg?' lg':''}"><s></s></div>`;return `<div class="bar${lg?' lg':''}" role="img" aria-label="${pct(x)} accuracy; target 75%"><i style="width:${Math.min(100,x*100)}%;--fill:var(${x>=TARGET?'--pos':'--neg'})"></i><s></s></div>`}
-const legend=()=>`<div class="legend"><span>0%</span><span class="thr">target 75%</span><span>100%</span></div>`;
-const mongo=t=>`<div class="mongo"><span class="leaf"><svg viewBox="0 0 16 16"><path d="M8 1c2.6 3 3.6 5.6 3.6 7.7 0 2.6-1.6 4.4-3.6 5.3-2-.9-3.6-2.7-3.6-5.3C4.4 6.6 5.4 4 8 1Z" fill="#5FD39A"/><path d="M8 4v11" stroke="#0D3A2C" stroke-width="1.1"/></svg></span><div><span class="t">In MongoDB</span><p>${t}</p></div></div>`;
-function hl(o){return esc(JSON.stringify(o,null,2)).replace(/(&quot;[^&]*?&quot;)(\s*:)/g,'<span class="k">$1</span>$2').replace(/:\s(&quot;.*?&quot;)/g,': <span class="s">$1</span>').replace(/:\s(-?\d+\.?\d*|true|false|null)/g,': <span class="n">$1</span>')}
-const resultText=f=>f.acc!=null?pct(f.acc)+' accuracy':(f.accText||'No measurement');
-function role(f){
-  const c=S.context; if(!c) return '';
-  if(c.use.includes(f)) return 'use'; if(c.avoid.includes(f)) return 'avoid'; if(c.nofit.includes(f)) return 'nofit'; return '';
-}
-const roleChip={use:'<span class="chip c-g">Claude Code is using this</span>',avoid:'<span class="chip c-neg">Avoiding</span>',nofit:'<span class="chip c-off">Doesn’t fit</span>'};
-function xlist(showAll){
-  const fs=S.order.map(k=>S.findings[k]).filter(f=>showAll||!f.background);
-  return `<div class="xlist">${fs.map(f=>{const r=role(f);return `<button class="xrow ${r}${f.key===S.lastNew?' new':''}" data-f="${f.key}"><span class="t">${esc(f.title)}<small>${esc(f.agent)} · ${resultText(f)}</small></span>${r?roleChip[r]:f.key===S.lastNew?'<span class="chip c-b">New</span>':label(f)}</button>`}).join('')}</div>`;
-}
-
-/* ---------- Demo stages ---------- */
-function done(){const g=gov(),L=S.receipts.map(r=>r.label);return [true,!!S.context,!!S.decision&&S.decision.status!=='pending',L.includes('With Precedent'),g.corrected&&g.expired,L.length>=4]}
-function demoPage(){
-  const dn=done();
-  return `<div class="stepper">${STAGES.map((s,i)=>`<button data-stage="${i+1}" class="${dn[i]?'done':''}" ${S.stage===i+1?'aria-current="step"':''} aria-label="Stage ${i+1}: ${s}"><span class="dotn">${dn[i]&&S.stage!==i+1?'✓':i+1}</span><span class="lbl">${s}</span></button>`).join('')}</div>
-  <div><div class="eyebrow">Stage ${S.stage} of ${STAGES.length}</div><h1>${STAGES[S.stage-1]}</h1></div>
-  ${[st1,st2,st3,st4,st5,st6][S.stage-1]()}
-  ${S.toast?`<div class="toast" role="status">${esc(S.toast)}</div>`:''}
-  <div class="stagebar">${S.stage>1?'<button class="btn ghost" data-act="prev">Back</button>':''}${S.stage<STAGES.length?'<button class="btn" data-act="next">Next</button>':''}</div>`;
-}
-const st1=()=>`<p class="lede">Before running anything, see what other agents already tried: what worked, what failed, and which model weights are stored.</p>
-  <div class="fcards">${S.order.map(k=>S.findings[k]).filter(f=>!f.mine).map(f=>`<button class="fcard" data-f="${f.key}"><span class="t">${esc(f.title)}</span><span class="chips">${label(f)}${f.weights?' <span class="chip c-g">Weights stored</span>':''}${f.background?' <span class="chip c-line">From the paper</span>':''}</span>${f.acc!=null?bar(f.acc):''}<span class="s">${resultText(f)}</span><span class="s">${esc(f.agent)} · ${esc(f.team)}</span></button>`).join('')}</div>
-  ${mongo('Each experiment is one document, and its model weights are stored next to it with <b>GridFS</b>. New experiments appear instantly through a <b>change stream</b>. The crash is kept, but never offered as evidence.')}`;
-function st2(){
-  return `<p class="lede">Open Claude Code in the embedded terminal and ask it to build on past work. The experiments it picks light up on the left.</p>
-  <div class="split">${xlist(false)}${terminal(S.context?null:{value:PROMPT1})}</div>
-  ${mongo(S.context?'Claude Code called the <b>search_experiments</b> tool. One Atlas query searched by meaning inside this project, checked each result is still current, and marked what fits. Its picks were saved and pushed here through a <b>change stream</b>.':'Claude Code talks to Precedent through MCP tools. Every tool call is a governed query in Atlas.')}`;
-}
-function st3(){
-  const d=S.decision;
-  if(!d) return '<p class="lede">Ask Claude Code at stage 2 first.</p>';
-  const inp=d.status==='pending'&&S.pending==='decide'?{value:d.job==='warm-start'?'Yes. Retrain from those weights, last layers only, stop at 8 GPU-hours.':'Yes, train from scratch with warmup, stop at 8 GPU-hours.',send:'Run it',no:{act:'notnow',label:'Not now'}}:null;
-  return `<p class="lede">You stay in charge. Tell Claude Code what to run, change the plan, or say no. Nothing runs until you do.</p>
-  <div class="split">${xlist(false)}${terminal(inp)}</div>
-  ${d.status==='rejected'?'<div class="row"><span class="status no">Not run. The plan is saved as rejected.</span><button class="btn ghost" data-act="askagain">Ask again</button></div>':''}
-  ${mongo(d.status==='pending'?'Claude Code’s plan is saved as <b>pending</b>. Your answer becomes one <b>atomic update</b>, so a plan can only be approved once.':d.status==='rejected'?'The plan was marked rejected. Training only starts for approved plans.':'Approved exactly once, by you. The run cites the exact experiment versions it used.')}`;
-}
-function st4(){
-  const d=S.decision, r=d&&d.receipt;
-  if(!r) return `<p class="lede">${d&&d.status==='rejected'?'You said not now, so nothing trained.':'Tell Claude Code to run the plan at stage 3.'}</p><div class="split">${xlist(false)}${terminal(null)}</div>`;
-  return `<p class="lede">Claude Code loaded the stored weights and retrained. The new result was saved back as an experiment the next person can build on.</p>
-  <div class="grid2">
-    <div class="card" style="background:var(--code-bg);color:var(--code-fg);border-color:var(--code-bg)"><div class="eyebrow" style="color:var(--code-c)">Claude Code on its own · no Precedent</div>
-      <pre style="margin:10px 0 0;font:12.5px/1.7 var(--f-mono);white-space:pre-wrap">$ claude "train a ResNet-50 to 75% on ImageNet,
-         8 GPU-hours"
-› No past experiments to build on.
-› Starting from random weights.
-› epoch 4 of 90 … budget used up
-› accuracy: <span style="color:#F2A27C">${pct(BASELINE.acc)}</span>   GPU-hours: ${BASELINE.gpu}</pre></div>
-    <div class="card" style="border-color:var(--green)"><div class="eyebrow" style="color:var(--green)">Claude Code with Precedent</div>
-      <div class="big" style="margin-top:10px;color:var(${r.acc>=TARGET?'--pos':'--neg'})">${pct(r.acc)}</div><p class="muted">accuracy · ${r.gpu} GPU-hours used</p>
-      ${r.job==='warm-start'?`<p style="margin-top:10px"><span class="chip c-g">${(BASELINE.gpu-r.gpu).toFixed(1)} GPU-hours saved</span> <span class="chip c-g">reached the 75% target</span></p>`:''}</div>
-  </div>
-  ${xlist(false)}
-  ${mongo(r.job==='warm-start'?'<b>load_weights</b> streamed the 98 MB checkpoint from <b>GridFS</b> after re-checking it was still current. <b>publish_result</b> saved the new experiment, and it appeared here through a change stream.':'The new experiment was saved and appeared here through a change stream.')}`;
-}
-function st5(){
-  const p=S.findings.ckpt,f=S.findings.fastlr,g=gov(),d=S.decision;
-  const fresh=d&&d.status!=='executed'&&d.gov.corrected===g.corrected&&d.gov.expired===g.expired;
-  const ran=S.receipts.find(r=>r.d&&r.d.gov.corrected===g.corrected&&r.d.gov.expired===g.expired);
-  let inp=null;
-  if((g.corrected||g.expired)&&!S.busy){
-    if(!fresh&&!ran) inp={value:'Same task again, with the updated memory.',send:'Send'};
-    else if(fresh&&d.status==='pending'&&S.pending==='decide') inp={value:'Yes, run it.',send:'Run it',no:{act:'notnow',label:'Not now'}};
-  }
-  return `<p class="lede">A researcher fixes one experiment and retires another. Then you ask Claude Code again.</p>
-  <div class="grid2">
-    <div class="card"><div class="eyebrow">1 · Correct</div><h2 style="margin:6px 0">${esc(p.title)}</h2>
-      <p class="muted" style="font-size:14px">${g.corrected?'Corrected: the linked weights only know 100 classes.':'A reviewer finds the linked weights were a 100-class fine-tune.'}</p>
-      <div style="margin-top:12px">${g.corrected?'<span class="chip c-b">Corrected</span> <button class="link" data-f="ckpt">See old and new</button>':'<button class="btn" data-act="correct">Correct it</button>'}</div></div>
-    <div class="card"><div class="eyebrow">2 · Expire</div><h2 style="margin:6px 0">${esc(f.title)}</h2>
-      <p class="muted" style="font-size:14px">It came from an old library version that has since been fixed.</p>
-      <div style="margin-top:12px">${g.expired?'<span class="chip c-bad">Expired</span> <button class="link" data-f="fastlr">See history</button>':`<button class="btn danger" data-act="expire" ${g.corrected&&ran?'':'disabled title="Correct first and rerun, so each change shows on its own"'}>Expire it</button>`}</div></div>
-  </div>
-  <div class="split">${xlist(false)}${terminal(inp)}</div>
-  ${mongo(g.expired?'Expiry took effect on the very next search. Atlas will delete the record later with a <b>TTL index</b>; nothing waits for that.':g.corrected?'The correction was one <b>transaction</b>: people can still read the old version, and Claude Code only gets the new one.':'Corrections and expiry change what Claude Code can use, starting with its next search.')}`;
-}
-function st6(){
-  const L=['Claude Code on its own','With Precedent','After correction','After correction + expiry'], by=l=>l===BASELINE.label?BASELINE:S.receipts.find(r=>r.label===l);
-  return `<p class="lede">Same Claude Code, same task, same 8 GPU-hours. First on its own, then with Precedent as people corrected and expired what it knew.</p>
-  <div class="card"><div class="compare">${L.map(l=>{const r=by(l);return `<div class="crow"><span class="lbl">${l}<small>${r?(r.outside?'outside the platform':JOBS[r.job].label)+' · '+r.gpu+' GPU-h':'not run yet'}</small></span>${r?bar(r.acc,true):'<div class="bar lg"><s></s></div>'}<span class="v" style="color:var(${r?(r.acc>=TARGET?'--pos':'--neg'):'--muted'})">${r?pct(r.acc):'—'}</span></div>`}).join('')}</div>${legend()}</div>
-  ${mongo('Every run records the exact experiment versions and weights it read from Atlas, and was saved back as a new experiment.')}`;
-}
-
-/* ---------- other pages ---------- */
-function researchPage(){
-  const q=S.q.toLowerCase(), fs=S.order.map(k=>S.findings[k]).filter(f=>!q||(f.title+' '+f.dataset+' '+f.agent+' '+f.team).toLowerCase().includes(q));
-  return `<div><div class="eyebrow">Research · vision-research</div><h1>All experiments</h1></div>
-  <form class="search" id="rs" role="search"><input id="rq" value="${esc(S.q)}" placeholder="Search experiments, agents or datasets" aria-label="Search experiments"><button class="btn ghost" type="submit">Search</button></form>
-  <div class="tbl"><table><thead><tr><th>Experiment</th><th>Result</th><th>Dataset</th><th>Weights</th><th>Status</th></tr></thead><tbody>
-  ${fs.map(f=>`<tr class="click" data-f="${f.key}"><td><b style="font-weight:600">${esc(f.title)}</b><div class="muted" style="font-size:12px">${esc(f.agent)} · ${esc(f.team)}</div></td><td>${label(f).split(' <')[0]}</td><td>${esc(f.dataset.split(' (')[0])}</td><td>${f.weights?'<span class="chip c-g">'+f.weights.size+'</span>':'—'}</td><td>${f.status==='expired'?'<span class="chip c-bad">Expired</span>':'<span class="chip c-g">Current</span>'}</td></tr>`).join('')}
-  </tbody></table></div>`;
-}
-function govPage(){
-  return `<div><div class="eyebrow">Governance</div><h1>Review experiments</h1></div>
-  <p class="lede">Correct an experiment if its record was wrong. Expire it if it shouldn’t guide agents anymore.</p>
-  <div class="tbl"><table><thead><tr><th>Experiment</th><th>Status</th><th>Last change</th><th></th></tr></thead><tbody>
-  ${S.order.map(k=>S.findings[k]).map(f=>{const h=f.history[f.history.length-1];return `<tr class="click" data-f="${f.key}"><td>${esc(f.title)} <span class="mono muted">v${f.version}</span></td><td>${f.status==='expired'?'<span class="chip c-bad">Expired</span>':f.exec!=='completed'?'<span class="chip c-bad">Crashed</span>':'<span class="chip c-g">Current</span>'}</td><td class="muted" style="font-size:13px">${h.action} by ${esc(h.actor)}</td>
-    <td style="white-space:nowrap;text-align:right">${f.key==='ckpt'&&f.version===1?'<button class="btn ghost" data-act="correct">Correct</button> ':''}${f.status==='current'&&f.exec==='completed'?`<button class="btn danger" data-act="expireAny" data-k="${f.key}">Expire</button>`:''}</td></tr>`}).join('')}
-  </tbody></table></div>`;
-}
-function settingsPage(){
-  const agents=[...new Set(SEED.map(s=>s.agent+' · '+s.team))];
-  return `<div><div class="eyebrow">Settings</div><h1>Environment</h1></div>
-  <div class="grid2">
-    <div class="card"><h2 style="margin-bottom:10px">MongoDB Atlas</h2><dl class="kv"><dt>status</dt><dd style="color:var(--pos)">connected</dd><dt>database</dt><dd>research_memory</dd><dt>vector index</dt><dd>research_memory_v1 · ready</dd><dt>model weights</dt><dd>GridFS · 2 files · 192 MB</dd><dt>change streams</dt><dd>on</dd><dt>cleanup</dt><dd>TTL index on purge_at</dd></dl></div>
-    <div class="card"><h2 style="margin-bottom:10px">Claude Code</h2><dl class="kv"><dt>terminal</dt><dd>embedded · your machine</dd><dt>connection</dt><dd>MCP server “precedent”</dd><dt>tools</dt><dd>search_experiments · get_experiment · load_weights · publish_result</dd><dt>access</dt><dd>vision-research only</dd></dl></div>
-    <div class="card"><h2 style="margin-bottom:10px">Contributors in this project</h2><ul style="margin:0;padding-left:18px;font-size:13.5px;display:flex;flex-direction:column;gap:4px">${agents.map(a=>`<li>${esc(a)}</li>`).join('')}<li>you + Claude Code</li></ul></div>
-    <div class="card"><h2 style="margin-bottom:10px">Baseline</h2><p style="font-size:13.5px">“Claude Code on its own” is the same Claude Code run <b>outside Precedent</b>, with no MCP connection. It was recorded before the demo.</p><p class="muted" style="font-size:13px;margin-top:8px">${pct(BASELINE.acc)} accuracy · ${BASELINE.gpu} GPU-hours</p></div>
-    <div class="card"><h2 style="margin-bottom:10px">Isolation check</h2><p class="muted" style="font-size:13px;margin-bottom:10px">Ask the same question from another team’s project.</p>
-      <button class="btn ghost" data-act="iso">Run check</button>${S.isolation?'<p style="margin-top:10px"><span class="chip c-g">Found 0 results</span> <span class="chip c-g">Direct read refused (404)</span></p>':''}</div>
-  </div>`;
-}
-
-/* ---------- inspector ---------- */
-function inspector(){
-  const el=document.getElementById('insp'), sel=S.sel;
-  if(sel&&sel.f){const f=S.findings[sel.f], prev=f.history.find(h=>h.prev), r=role(f);
-    el.innerHTML=`<div class="eyebrow">Experiment · ${refOf(f)}</div><h2>${esc(f.title)}</h2><div class="chips">${label(f)} ${r?roleChip[r]:''}</div>
-    <div class="isec" style="margin-top:14px"><h4>Trained on</h4><dl class="kv"><dt>model</dt><dd>${esc(f.model)}</dd><dt>dataset</dt><dd>${esc(f.dataset)}</dd><dt>images</dt><dd>${esc(f.image)}</dd><dt>settings</dt><dd>${esc(f.settings)}</dd></dl></div>
-    <div class="isec"><h4>Result</h4>${f.acc!=null?`${bar(f.acc,true)}${legend()}<p class="num" style="font-size:13px">${pct(f.acc)} accuracy · ${esc(f.gpu)}</p>`:`<p style="font-size:13.5px">${esc(f.error||f.accText)}${f.exec!=='completed'?' A crash doesn’t show whether the idea works, so it is never offered as evidence.':''}</p>`}</div>
-    ${f.weights?`<div class="isec"><h4>Weights</h4><dl class="kv"><dt>file</dt><dd>${f.weights.file}</dd><dt>size</dt><dd>${f.weights.size}</dd><dt>source</dt><dd>${esc(f.weights.src)}</dd><dt>stored in</dt><dd>Atlas GridFS · ${f.weights.id}</dd></dl></div>`:''}
-    ${prev?`<div class="isec"><h4>Versions</h4><div class="vers"><div class="ver"><b>v1 · old</b><span>${esc(prev.prev.title)}</span><span class="muted">${esc(prev.prev.dataset)}</span></div><div class="ver cur"><b>v2 · current</b><span>${esc(f.title)}</span><span class="muted">${esc(f.dataset)}</span></div></div><p class="muted" style="font-size:12px">People can read v1. Claude Code only gets v2.</p></div>`:''}
-    <div class="isec"><h4>History</h4><ul class="hist">${f.history.map(h=>`<li><span class="w">${h.at}</span><span>${h.action} by ${esc(h.actor)}${h.reason?` · “${esc(h.reason)}”`:''}</span></li>`).join('')}</ul></div>`;return}
-  if(sel&&sel.ev!=null){const e=S.events[sel.ev];
-    el.innerHTML=`<div class="eyebrow">Atlas · ${e.t}</div><h2>${esc(e.op)} · ${esc(e.coll)}</h2><p style="font-size:13.5px">${esc(e.detail)}</p>
-    <div class="isec" style="margin-top:12px"><dl class="kv"><dt>time</dt><dd>${e.ms!=null?e.ms+' ms':'—'}</dd><dt>documents</dt><dd>${e.docs??'—'}</dd></dl></div>
-    ${e.shape?`<div class="isec"><h4>What ran (simplified)</h4><pre class="code">${hl(e.shape)}</pre></div>`:''}`;return}
-  const c=S.context;
-  if(S.page==='demo'&&c&&S.stage>=2&&S.stage<=5){
-    const grp=(t,list)=>`<div class="isec"><h4>${t}</h4>${list.length?list.map(f=>`<div style="font-size:13.5px"><button class="ref" data-f="${f.key}">${refOf(f)}</button> ${esc(f.title)}</div>`).join(''):'<span class="muted" style="font-size:13px">None</span>'}</div>`;
-    el.innerHTML=`<div class="eyebrow">Claude Code’s context</div><h2>${S.decision?JOBS[S.decision.job].label:'Evidence'}</h2>${S.decision?`<div class="chips"><span class="chip ${S.decision.status==='rejected'?'c-bad':S.decision.status==='pending'?'c-b':'c-pos'}">${S.decision.status==='pending'?'waiting for you':S.decision.status}</span></div>`:''}
-    ${grp('Using',c.use)}${grp('Avoiding',c.avoid)}${grp('Doesn’t fit',c.nofit)}${c.dropped.length?grp('Left out by the platform',c.dropped.map(x=>x.f)):''}`;return}
-  el.innerHTML=`<div class="eyebrow">Details</div><h2>The task</h2><p style="font-size:14.5px">Train a ResNet-50 that reaches 75% accuracy on ImageNet within 8 GPU-hours.</p>
-  <div class="isec" style="margin-top:14px"><h4>How it works</h4><p style="font-size:13.5px">You browse past experiments, then ask Claude Code in the embedded terminal. It pulls experiments from Precedent, shows which it will use, and runs only what you tell it to.</p></div>
-  <p class="muted" style="font-size:13px;margin-top:8px">All numbers are mockup data. Click any experiment or Atlas line to see it here.</p>`;
-}
-
-/* ---------- render & events ---------- */
 function render(){
-  document.querySelectorAll('.nav button').forEach(b=>b.setAttribute('aria-current',b.dataset.page===S.page?'page':'false'));
-  document.getElementById('page').innerHTML={demo:demoPage,research:researchPage,governance:govPage,settings:settingsPage}[S.page]();
-  const rs=document.getElementById('rs'); if(rs) rs.addEventListener('submit',e=>{e.preventDefault();S.q=document.getElementById('rq').value;render()});
-  const tf=document.getElementById('tform'); if(tf) tf.addEventListener('submit',e=>{e.preventDefault();onSend(document.getElementById('tin').value.trim())});
-  const tb=document.getElementById('tbody'); if(tb) tb.scrollTop=tb.scrollHeight;
-  inspector(); S.toast=null;
+  $('steps').innerHTML = STAGES.map((s,i)=>`<li class="${i<S.stage?'done':i===S.stage?'now':''}" ${i===S.stage?'aria-current="step"':''}><span class="n">${i<S.stage?'✓':i+1}</span><span class="l">${s}</span></li>`).join('');
+  const heading = ['What have other agents already tried?','Ask Claude Code to build on it','You decide what runs','The memory changed the decision'][S.stage];
+  const act = S.stage===0 ? `<button class="btn" id="next">Ask Claude Code →</button>` : '';
+  const keepTerm = $('tbody') && $('tform');
+  const sideH = S.stage===0 ? 'Past experiments' : 'Experiments Claude Code is reading';
+  $('stage').innerHTML = `
+    <div class="task"><div><h1>${heading}</h1><p class="sub">Task: fine-tune <b>${TASK.model}</b> on <b>${TASK.dataset}</b> to 90% · ${TASK.budget}</p></div>${act}</div>
+    <div class="mongo"><span class="leaf"><svg width="16" height="16" viewBox="0 0 16 16" fill="#5FD39A"><path d="M8 1c2.5 3 4 5 4 7.5A4 4 0 0 1 8.5 13V15h-1V13A4 4 0 0 1 4 8.5C4 6 5.500 4 8 1z"/></svg></span><div><span class="t">In MongoDB</span><p>${CALLOUT[S.stage]}</p></div></div>
+    <div class="split"><div>${termBox()}</div><div><div class="panel-h"><span>${sideH}</span><span>${S.ex.length} in memory</span></div><div class="xlist">${S.ex.map(xrow).join('')}</div></div></div>
+    ${S.result?resultCard():''}`;
+  renderTerm(); renderDrawer();
+  const n=$('next'); if(n) n.onclick=()=>{S.stage=1;render();};
+  const g=$('go'); if(g) g.onclick=()=>{S.stage=1;askClaude();};
+  const f=$('tform'); if(f) f.onsubmit=e=>{e.preventDefault(); if(!S.busy) askClaude();};
+  const y=$('yes'); if(y) y.onclick=()=>decide(true);
+  const no=$('no'); if(no) no.onclick=()=>decide(false);
+  const a=$('again'); if(a) a.onclick=reset;
+  document.querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{S.sel=b.dataset.x;S.ev=null;renderDrawer();});
 }
-async function onSend(text){
-  if(!text||S.busy) return;
-  const d=S.decision;
-  if(d&&d.status==='pending'&&S.pending==='decide') return runPlan(text);
-  return askClaude(text);
-}
-function go(n){S.stage=n;S.sel=null;render()}
-const showInsp=()=>{if(innerWidth<1180)document.getElementById('insp').scrollIntoView({behavior:'smooth'})};
-document.querySelector('.nav').addEventListener('click',e=>{const b=e.target.closest('[data-page]');if(b){S.page=b.dataset.page;S.sel=null;render()}});
-document.getElementById('lines').addEventListener('click',e=>{const b=e.target.closest('[data-ev]');if(b){S.sel={ev:+b.dataset.ev};inspector();showInsp()}});
-document.addEventListener('click',async e=>{
-  const st=e.target.closest('[data-stage]'); if(st) return go(+st.dataset.stage);
-  const a=e.target.closest('[data-act]');
-  if(a){const act=a.dataset.act;
-    if(act==='next') return go(Math.min(STAGES.length,S.stage+1));
-    if(act==='prev') return go(Math.max(1,S.stage-1));
-    if(act==='notnow') return notNow();
-    if(act==='askagain'){S.pending=null;return askClaude('Okay, propose it again.')}
-    if(act==='correct'){correct(CORRECTION.reason);render();return}
-    if(act==='expire'){expire('fastlr','From an old library version that has since been fixed');render();return}
-    if(act==='expireAny'){expire(a.dataset.k,'No longer relevant');render();return}
-    if(act==='iso'){log('aggregate','result_vectors','same search from project other-lab · 0 results',{ms:31,docs:0});log('find','results','direct read from other-lab · not found',{ms:3,docs:0});S.isolation=true;render();return}
-  }
-  const f=e.target.closest('[data-f]'); if(f){S.sel={f:f.dataset.f};inspector();showInsp();return}
-});
 
-(async()=>{ await runAgents(false); render(); })();
+/* ---------- details drawer: opens only on click ---------- */
+function renderDrawer(){
+  const d=$('drawer'); let h='';
+  if(S.sel){
+    const f=S.ex.find(x=>x.key===S.sel), [c,l]=labelOf(f);
+    h=`<button class="x" id="close" aria-label="Close">×</button><span class="chip ${c}">${l}</span><h2>${esc(f.title)}</h2>
+    <div class="isec"><h4>Conditions</h4><dl class="kv"><dt>dataset</dt><dd>${esc(f.dataset)}</dd><dt>model</dt><dd>${esc(f.model)}</dd><dt>input size</dt><dd>${f.image}</dd></dl></div>
+    <div class="isec"><h4>What was tried</h4><p style="font-size:13.5px">${esc(f.settings)}</p></div>
+    <div class="isec"><h4>Outcome</h4>${f.error?`<p style="font-size:13.5px">${esc(f.error)}</p>`:`<dl class="kv"><dt>test accuracy</dt><dd>${f.acc!=null?pct(f.acc):'—'}</dd><dt>GPU time</dt><dd>${f.secs}</dd><dt>execution</dt><dd>${f.exec}</dd><dt>direction</dt><dd>${f.dir}</dd></dl>`}</div>
+    ${f.cmd?`<div class="isec"><h4>Rerun it</h4><pre class="code">${esc(f.cmd)}</pre></div>`:''}
+    ${f.weights?`<div class="isec"><h4>Stored weights</h4><dl class="kv"><dt>file</dt><dd>${f.weights.file}</dd><dt>size</dt><dd>${f.weights.size}</dd><dt>source</dt><dd>${esc(f.weights.src)}</dd></dl></div>`:''}
+    <div class="isec"><h4>Record</h4><dl class="kv"><dt>id</dt><dd>${f.id} · v${f.version}</dd><dt>source agent</dt><dd>${esc(f.agent)}</dd><dt>status</dt><dd>current</dd></dl></div>`;
+  } else if(S.ev!=null){
+    const e=S.events[S.ev];
+    h=`<button class="x" id="close" aria-label="Close">×</button><span class="chip c-g">${e.change?'Change stream':'MongoDB command'}</span><h2>${esc(e.op)} ${esc(e.coll)}</h2>
+    <div class="isec"><h4>What happened</h4><p style="font-size:13.5px">${esc(e.detail)}</p></div>${e.shape?`<div class="isec"><h4>Redacted command</h4><pre class="code">${esc(e.shape)}</pre></div>`:''}`;
+  }
+  d.innerHTML=h; d.classList.toggle('open',!!h);
+  const x=$('close'); if(x) x.onclick=()=>{S.sel=null;S.ev=null;renderDrawer();};
+}
+$('lines').addEventListener('click',e=>{const b=e.target.closest('[data-ev]'); if(b){S.ev=+b.dataset.ev;S.sel=null;renderDrawer();}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){S.sel=null;S.ev=null;renderDrawer();}});
+
+/* seed events: the experiments arriving in memory before the demo starts */
+['vision-agent-1','vision-agent-2','robotics-agent','eval-agent','ResNet paper (imported)'].forEach(a=>log('insert','results',`experiment from ${a}`,{ms:11,dt:.6}));
+chg('results','insert · 5 experiments live');
+render();
 </script>
+</html>

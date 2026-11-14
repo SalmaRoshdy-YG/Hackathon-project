@@ -1,89 +1,71 @@
 # Team task board
 
-Claim a role by adding your name. P4 is integration lead and submitter. P2 backs up submission if needed. P4 owns checkout setup, dependency integration, and this board. Each owner edits their own paths in the shared event checkout, using separate branches if available. P1 owns changes to the [platform contract](PLATFORM.md) and coordinates them with affected callers. P2 and P3 start against the documented HTTP payloads while P1 starts Atlas. P4 starts the harness and UI against stub responses. What we're building and why is in [REQUIREMENTS.md](REQUIREMENTS.md).
+What we're building and why is in [REQUIREMENTS.md](REQUIREMENTS.md). The contract is [PLATFORM.md](PLATFORM.md). Parallel-agent prompts for the open work are in [PROMPTS.md](PROMPTS.md). Submission is due **5:00 p.m. Toronto time**.
 
-| ID | Workstream | Owner | Status | First task and pass condition |
+## Where we are
+
+| Piece | State | Evidence |
+| --- | --- | --- |
+| Atlas platform (`platform_api/`) | **Built and reported verified live** by a teammate: preflight, unit tests, isolation, GridFS artifacts. | Handoff below. Not re-run by the reviewer. |
+| ResNet-50 digits experiment (`experiments/resnet.py`) | **Built.** `seed` publishes three calibration experiments, `train` runs a job, the profile plugs into the platform. | Scratch 29.2% against `reuse` 90.4% on the holdout, once. |
+| Workbench (`workbench/`) | **Built.** Embedded Codex terminal, `/mcp` endpoint, research library, run comparison, Atlas activity, Run plan and Reject. | Handoff below, including an HTTPS preview. |
+| Crashed-run seed | **Missing.** R1 needs a stored crash that is never offered. | — |
+| Single-screen UI from the mockup | **Not done.** The workbench has a sidebar with three views and stacked panels. | [docs/demo/index.html](docs/demo/index.html) is the target. |
+| Stability, timing and GPU check | **Not done.** One run each so far, and the install notes use the CPU build of PyTorch. | — |
+| Mockup and deck numbers | **Out of date.** They show ResNet-18 on CIFAR-10 and "Claude Code". The build is ResNet-50 on digits with Codex. | — |
+| Rehearsal, fallback, video, submission | **Not done.** | — |
+| Governance in the UI (correct, expire, history) | **Backend built, no UI.** Phase 2. | — |
+
+## Open work
+
+Each item has a ready-to-paste prompt in [PROMPTS.md](PROMPTS.md). Paths are owned by one item at a time so agents can work in parallel without edit conflicts.
+
+| ID | Work | Owns | Depends on | Pass condition |
 | --- | --- | --- | --- | --- |
-| P1 | Platform and Atlas | Open | Ready | Own `platform_api/` except `decisions.py`. At 10:45, ping event Atlas, insert two same-text sentinels in different projects, and start the index. Pass when `python -m demo.check_platform` confirms both token identities retrieve their own sentinel through the live API and neither can get the other sentinel or its evidence. Use distinct fixture project IDs. Then build publish, search as the single aggregation pipeline in PLATFORM.md (isolation, stale-version check, expiry and applicability all in Atlas), the PyMongo command listener, `GET /v1/results`, history with `result_versions`, correct, expire, resolve and `/v1/health`. |
-| P2 | Approval and presenter | Open | Ready | Own `platform_api/decisions.py` (P1 mounts it), `demo/presenter.py`, `demo/reset.py` and `NOTICE.md`. Build the decision routes with conditional updates, then the presenter service per [Presenter service](PLATFORM.md#presenter-service), including change streams on `results` and `decisions` and the `/demo/events` stream. Pass when a pending decision can be approved or rejected only once and only by the maintainer, a receipt is refused unless the decision is approved, and the presenter runs Agent B, approve, execute, correct, expire and rerun end to end against the stub API. |
-| P3 | Agent and experiment | Open | Ready | Register the selected experiment profile, measured jobs, producer, and planner. Verify its evidence and approval flow against Atlas. |
-| P4 | UI, integration and demo | Open | Ready | Own `demo/web/`, `requirements.txt` and rehearsal docs. Scaffold the four-page UI against stubbed presenter responses and a recorded `/demo/events` sample, including the Atlas activity strip and the per-stage “In MongoDB” callouts,. Pass when the dry run invokes A and fresh B processes, auto-approves with the maintainer token and records that in each receipt, validates receipt shape, propagates child failures, and writes an assertion summary. Own clean-checkout rehearsal, recording and submission. |
-
-## User interface
-
-P4 builds the UI in [PLATFORM.md](PLATFORM.md#user-interface) from the [requirements](REQUIREMENTS.md#interface), starting with stubbed presenter responses. P2 supplies the presenter routes. P3 supplies decision and execution receipts.
-
-Pass when the presenter can, from the Demo page alone: run Agent A and see four findings appear, including a crash labelled differently from the failed approach; run Agent B and see candidates grouped as applicable success, applicable failure and doesn't match (cohort B ≠ A); reject once and see nothing run; run again, approve, and see the measured result against the baseline; correct the promising finding and rerun; expire the failed approach and rerun; and compare the four receipts. Research shows the expired finding as Expired and the corrected one with v1 and v2 in its history. Settings shows Atlas health and the isolation check returning nothing for the second project. Every stage’s “In MongoDB” callout and the activity strip are filled from live events, and new findings appear without a reload.
-
-Review the UI at 3:15 with the clean rehearsal. If the UI is unfinished at the 3:45 freeze, present from the rehearsal receipts and keep the Demo page for the stages that work.
-
-## Handoff between producers and callers
-
-- P3 supplies measured JSON receipts with fixtures, conditions, configurations, outcomes, and reproduction metadata. See [Experiment profiles](BACKEND.md#switch-experiments).
-- P3 supplies the correction fixture through the presentation profile.
-- P4's rehearsal starts the platform with a fresh project ID and token mapping, runs A, polls search until the required versions are current, then runs B in four states in order: memory off, memory on, after correcting the promising finding, and after also expiring the failed approach. Each B run proposes, is auto-approved with the maintainer token (recorded as `rehearsal-auto` in the receipt), and executes. It also records one rejected decision that never executes. For the semantic smoke check, P4 adds five unrelated completed findings through the API. P4 logs request, catalog, budget, receipts and assertion outcomes to `receipts/rehearsal/`. Keep credentials in the local environment and out of output. P1 provides the local env setup and the preflight.
+| W1 | Seed completeness, calibration, stability and GPU | `experiments/`, `receipts/` (local), BACKEND install notes | — | A crashed run is seeded and never returned by search. Three consecutive scratch and `reuse` runs on the demo machine give stable results on the right side of 80%. Training time is recorded. PyTorch uses the GPU. |
+| W2 | Single-screen UI | `workbench/web/` | — | The four stages run from real events on one screen, highlights show used, avoided and doesn't fit, the result card shows both runs, and "Reject" leaves no run. |
+| W3 | Rehearsal, fallback, video, submission | `rehearsal/`, `SUBMISSION.md` | W1 numbers, W2 for the video | Three clean full runs under three minutes, a labelled fallback, a one-minute video script and a checked submission list. |
+| W4 | Pitch alignment | `docs/demo/`, `docs/deck/` | W1 numbers (start now with 29.2% and 90.4%) | Mockup and deck show ResNet-50 on digits, Codex, the real job names and measured numbers. |
+| W5 | Verify and harden | `tests/`, `.github/`, `platform_api/` fixes only | — | All checks pass and are recorded. Secrets scan is clean. Cross-project reads of results, artifacts and decisions fail. Approval runs once. |
+| W6 | Governance in the UI (Phase 2) | `workbench/` correct and expire controls | W2 | Only after W1–W5 pass. Correct and expire an experiment from the UI and ask again. |
 
 ## Verification gates
 
-| Owner | Check | Pass condition |
+| Check | Pass condition | Status |
 | --- | --- | --- |
-| P1 | `python -m demo.check_platform` against event Atlas | Database ping, read/write and index permissions verified. Queryable index and approved embedding credentials produce one 1536-float vector and a filtered round trip. Same-question queries return each project's own sentinel. Cross-project direct result, evidence, history and decision reads return 404. Test cross-project writes and resolve, same-project reader writes and stale expected versions. |
-| P1 | Lifecycle via the live routes and deterministic stale-hit test | After correction, the old version's read, evidence and resolve return 404, the current version resolves, and history returns both versions with actor, time and reason. Feed the old version and an expired version as candidate hits to the real search hydration logic and assert both are excluded. Verify an expired result still appears in `GET /v1/results` with `status:"expired"` and is absent from search, read and resolve before TTL cleanup. Check scheduled expiry with `--promising-expires-at` the same way. Verify a decision whose cited ref was revoked after approval aborts without running. |
-| P1 | MongoDB does the work | The command log shows exactly one `aggregate` on `result_vectors` per search, containing `$vectorSearch` with the `project_id` filter and the `$lookup`. With a stale vector entry and an expired head planted, that one aggregate returns neither. Preflight reports `$vectorSearch` with filter, `$lookup` after it, transactions, change streams and the TTL index as supported, or names the missing one. |
-| P1 | Applicability labels | Search with the task conditions labels A's two cohort A findings `applies` and the cohort B finding `mismatch` with `cohort: wanted A, found B`. The crash is never returned. A decision citing a mismatched ref is rejected with 422. |
-| P2 | Decision state machine and presenter | A publish, correction, expiry and approval each reach `/demo/events` as a `change` event within one second, and each command appears as an `atlas` event with no URI, token or raw vector. Approve and reject need the maintainer token, work once, and return 409 after. A receipt before approval returns 409. The presenter never sends a token to the browser (check the page source and network responses). Presenter isolation check returns no candidates and 404. |
-| P4 | Clean event checkout and submission rehearsal | Run `python -m pip install -r requirements.txt`, supply environment values locally, run the service preflight and rehearsal, and save redacted receipts. The public repo opens without credentials, the video is accessible in a signed-out session, and the submission lists everyone. |
+| `python -m unittest discover -s tests` | Passes offline. | Passed offline on the reviewer's machine (2 tests). The teammate reports it passing in their environment. |
+| `python -m platform_api.preflight` on event Atlas | Ping, queryable index, embedding round trip. | Reported passed by the teammate. |
+| Live run | Scratch baseline, then agent search, plan, Run plan, `reuse` run, new finding and checkpoint stored. | Reported passed once (29.2% then 90.4%). |
+| Isolation | Second project's search returns nothing, and result, evidence, artifact and decision reads return 404. | Reported for the artifact route. W5 verifies all paths. |
+| Crash never offered | The seeded crash is stored and absent from search. | **Open (W1).** |
+| Stability | Three repeats of the baseline and the guided run land on the same sides of 80%, and the agent proposes `reuse` each time. | **Open (W1, W3).** |
+| Single-screen UI | See W2. | **Open.** |
+| Clean checkout | A fresh clone runs the demo from the documented steps, and the public repo opens signed out. | **Open (W3, W5).** |
 
-## Build window and cutoffs
+Mark each gate with the commit, exact command and observed result when it passes. A check against a stub or fixture must say so.
 
-Times are Toronto local. Workstreams begin at 10:45 a.m. P4 provisions the shared event checkout immediately. Owners can start in separate local folders using the contract and then copy their owned paths into the checkout if repository access takes longer.
+## Time plan to the 5:00 p.m. submission
 
-| Time | Owner and decision |
+| By | Goal |
 | --- | --- |
-| 10:45–11:05 | P1 checks Sandbox network access, credentials, write and index privileges and starts indexing. P1 checks embeddings and P3 checks one planner call with the team's approved credentials. P4 verifies submission access. |
-| 11:30 | P3 delivers the calibration and holdout matrix, the crash receipt and the receipt shape. If the baseline contrast is weak, check stream reset, dictionary pairing and ratio accounting against the probe before freezing the fixture. If needed, P3 can strengthen dictionary recurrence by 11:50 and coordinate one revision change with P1, P2 and P4. Compare the same revised fixture, request and catalog across all states. |
-| 11:15 | P1 reports which Atlas features the Sandbox supports. If change streams are missing, P2 switches the presenter to the 500 ms polling fallback and the UI labels it. If `$lookup` after `$vectorSearch` is rejected, P1 keeps the same stages but runs the `results` match as a second `find` by `_id` and version, and the activity strip shows both commands. |
-| Noon | P1 targets the real Atlas sentinel round trip. If it misses, check index status, vector dimensions, filtering and privileges. By 12:15, use a verified queryable index with the same definition in the event Sandbox if available, or ask event support to unblock the existing index. P2–P4 continue against contract responses. |
-| 12:45 | P2 hands over the decision routes. P4 has the four UI pages rendering stub data. If approval slips, keep the Approve and Reject buttons and enforce approval in the platform dispatcher by reading the decision status, then finish the routes after the freeze. |
-| 2:00 | P4 targets a real publish → search → propose → approve → execute with a versioned receipt, driven from the presenter. If Atlas is still unavailable at 1:30, P1 works with event support and P4 advances all offline assertions before retrying the real gate. A failed real gate remains open. Use previously verified event Sandbox receipts for demo continuity if a temporary outage follows a successful real rehearsal. |
-| 2:45 | P1 and P4 complete isolation, correction, expiry, history and stale-hit checks. If model access or repeated decisions are unstable, P3 switches to the same evidence-first policy as a stateless local planner and uses it in every state. Label that path as a rule-based agent. Keep the same real semantic search and job receipts. P1 escalates embedding credential issues at 11:05 and confirms a working credential by noon. Any provider change requires the same embedding model and dimensionality for stored and query vectors, or a fresh indexed corpus and a rerun of the semantic gate. |
-| 3:15 | Clean rehearsal complete with the four receipts and the rejected decision. P4 times each Demo stage. If B's proposal takes over 30 seconds or the full flow over 3 minutes, pre-seed A's findings and keep B, approval, execution, correction, expiry and reruns live. Use verified event Sandbox capture if availability changes during judging. |
-| 3:45 | Freeze the working build and verified outputs. Cut recording polish and Settings extras first. Minimum demo keeps real event Atlas Vector Search in the single pipeline, the Atlas activity strip, applicability labels, approval, a measured job change, both correction and expiry with reruns, and the isolation check. |
-| 3:45–4:15 | Rehearse and record the one-minute video. P4 uploads and checks viewing access. |
-| 4:30 | P4 targets the submitted form with public repo, accessible video and all names. Open both links signed out and confirm the submission receipt. Keep 30 minutes for link, upload or form recovery before 5:00. |
+| Now | W1, W2, W4 and W5 start in parallel. |
+| 3:45 | W1 done with real numbers. W2 shows the four stages from real events. W4 has the new mockup and deck text. |
+| 4:15 | Freeze. W3 runs three clean rehearsals. If the UI isn't ready, present the working workbench and say so. |
+| 4:15–4:30 | Record the one-minute video. Check it opens signed out. |
+| 4:30 | Submit with the public repo, the video and all team members. Leave 30 minutes for recovery. |
 
-The plan allocates 45 minutes from the first live handoff to lifecycle checks, 30 minutes from those checks to clean rehearsal, and 30 minutes from clean rehearsal to freeze. A 45-minute index delay past noon can still fit if P2 and P3 deliver against stubs and P4 integrates on schedule. A delay past 1:30 leaves 30 minutes to hit the live slice and puts the demo at risk. Preserve the event Sandbox gate and spend the 2:00–3:15 window on that path before UI polish. With three people, combine P2 and P4: that owner builds the decision routes first, then the presenter and UI, and timeboxes Settings to 20 minutes.
+Fallbacks, in order: if the agent is unstable, use a scripted planner with the same evidence rules and label it. If the embedded terminal fails, run the agent in a normal terminal beside the browser. If Atlas is unavailable late, show verified receipts from an earlier real run and say so. Do not add Phase 2 governance to the live demo until the gates pass.
 
-## Demo sequence
+## Demo script
 
-- **One-minute recording.** Keep the Atlas activity strip in frame throughout. 0–8s Agent A's findings streaming in live, including the crash label. 8–20s B's paraphrased Atlas search with applies and doesn't-match labels. 20–28s B's recommendation and the human approving it. 28–38s measured result against the memory-off baseline. 38–52s correct one finding, rerun, recommendation changes; expire another, rerun, evidence changes. 52–60s the four receipts side by side and the public repo.
-- **Three-minute live demo.** Follow the seven Demo stages and read each stage’s “In MongoDB” callout aloud in one sentence. 0–20s Agent A discovers. 20–50s MongoDB remembers and B retrieves by meaning. 50–80s B recommends; point at the rejected cohort B finding. 80–95s approve. 95–115s execute and compare with the baseline. 115–155s correct, rerun, expire, rerun, and open the history. 155–170s updated decision and the isolation check in Settings. Keep the final ten seconds for questions or delays.
+- **One-minute video.** Keep the Atlas strip in frame. 0–10s past experiments, including the crash and the stored checkpoint. 10–25s the agent searches and its picks light up (using, avoiding, doesn't fit). 25–35s the plan and "Run plan". 35–50s training, then the result next to the agent on its own. 50–60s the new experiment in the list and the public repo.
+- **Three-minute live demo.** Four stages, one "In MongoDB" sentence each. 0–25s past experiments. 25–80s the agent searches, point at the highlights including the one that doesn't fit. 80–110s the plan, Reject once to show nothing runs, then Run plan. 110–160s training and the result against the baseline, and the new experiment. 160–180s isolation: another project gets nothing back. Governance (correct, expire) is a talking point until Phase 2 lands.
 
 ## Handoffs
 
-Add a short entry with task ID, status, branch or commit, exact check and observed result, and any dependency or next owner. Record the working integration command here once it exists. Keep private logs local and link only evidence suitable for the public repo.
+Add a short entry with work ID, status, branch or commit, exact check and observed result, and any dependency or next owner. Keep private logs local and link only evidence suitable for the public repo.
 
-Kickoff evidence includes the local Python 3.11 compression probe and the pinned upstream source inspection. On November 14 the team adopted its own requirements list (one domain, human approval, both governance events live, version history) and dropped ResNet, open experiments and ARA/AutoSci adapters from the MVP; see [REQUIREMENTS.md](REQUIREMENTS.md#decisions-log). Pending from P1 are event Sandbox access, index queryability and embeddings. Pending from P3 is the planner credential check. Pending from P4 are event checkout and submission access.
-
-**First implementation task.** P1 starts Sandbox preflight at 10:45 a.m. Pass when the real API query returns the authorized project's sentinel and the second project's query returns its own sentinel while excluding the first project's result and evidence. Index creation and application work can proceed in parallel while the query becomes ready.
-
-
-### Backend handoff
-
-Backend branch: `backend/precedent-mongo`. See [BACKEND.md](BACKEND.md) for the startup commands, presenter API, event shapes, and integration path. The static mockup and pitch deck are unchanged.
-
-| Workstream | Verification and observed result |
-| --- | --- |
-| P1 Atlas | `python -m demo.check_platform` passed against the event Sandbox. Each project saw its own same-text sentinel. Cross-project reads and writes were denied. Superseded, manually expired and scheduled-expiry refs were blocked while the vectors and TTL records still existed. The correction transaction preserved history and an approved decision with a revoked citation aborted. |
-| P2 Presenter | `python -m demo.check_presenter --out receipts/presenter-final` passed all four browser API runs, rejection, state and history, and isolation. It verified real redacted vector search, atomic approval, correction transaction and expiry events. Approval, correction and expiry were delivered to the browser client in 266, 547 and 204 ms respectively. |
-| Pending | Frontend owner connects their build to the presenter and verifies the guided interface. The working backend uses BGE plus the rules planner; live checks of the optional OpenAI mode need a team API key. |
-
-
-The platform and presenter also passed an alternate experiment end to end with `python -m tests.check_lookup_profile`. The same API approved and measured 122 / 7 / 122 / 122 comparisons with its own job catalog, condition fields, reproduction data, and correction. Atlas preflight and the default presenter rehearsal passed after the profile refactor.
-
-The compression implementation and its rehearsal have been retired. The Atlas and presenter checks use an ordered-lookup test fixture. The selected experiment will plug in through the profile documented in BACKEND.md.
-
-### Live workspace handoff
+### Live workspace handoff (from the teammate who built it)
 
 - Started from `main` at `fd3a73b`. The [live workspace startup and training steps](BACKEND.md#live-workspace) run the Codex terminal, Atlas-backed research library, and run comparison.
 - Ran `python -m experiments.resnet seed` and `python -m experiments.resnet train scratch holdout receipts/resnet-baseline.safetensors`. The scratch run measured 29.2% on the holdout. Codex searched Atlas through MCP and produced a plan citing a compatible calibration result. After browser confirmation the ResNet job measured 90.4% on the same holdout, published a finding, and saved the weights to GridFS. Verified the output byte count and SHA-256 through the download route and a 404 for the second project.
