@@ -173,6 +173,25 @@ def seed():
                                                                title).model_dump(mode="json")))
             save({**ref, "job": job, "image_px": image_px, "metric": receipt["metric"], "artifact": artifact})
 
+        crash = Publish(
+            schema_version=1,
+            hypothesis="ResNet-50 calibration on 64 px handwritten digits interrupted before evaluation",
+            fixture_revision=TASK["fixture_revision"],
+            conditions={key: value for key, value in TASK.items() if key != "fixture_revision"},
+            configuration={"job_id": "reuse"},
+            metric={"name": "top-1 accuracy", "value": None, "unit": "fraction",
+                    "operator": ">=", "threshold": .8},
+            execution="crashed", validity="invalid", direction="undetermined",
+            evidence={"kind": "job_receipt", "data": {
+                "error": "Seeded example: the training process exited before evaluation.",
+            }},
+            source={"system": "resnet-digits", "source_agent": "calibration-agent", "record": str(uuid4())},
+            expires_at=utcnow() + timedelta(days=7),
+        )
+        ref = require(api.post("/v1/results", json=crash.model_dump(mode="json")))
+        save({**ref, "job": crash.configuration["job_id"], "image_px": crash.conditions["image_px"],
+              "execution": crash.execution, "metric": crash.metric.model_dump(), "artifact": None})
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)

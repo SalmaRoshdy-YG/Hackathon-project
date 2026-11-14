@@ -7,11 +7,11 @@ What we're building and why is in [REQUIREMENTS.md](REQUIREMENTS.md). The contra
 | Piece | State | Evidence |
 | --- | --- | --- |
 | Atlas platform (`platform_api/`) | **Built and reported verified live** by a teammate: preflight, unit tests, isolation, GridFS artifacts. | Handoff below. Not re-run by the reviewer. |
-| ResNet-50 digits experiment (`experiments/resnet.py`) | **Built.** `seed` publishes three calibration experiments, `train` runs a job, the profile plugs into the platform. | Scratch 29.2% against `reuse` 90.4% on the holdout, once. |
+| ResNet-50 digits experiment (`experiments/resnet.py`) | **Built and verified on CUDA.** Three calibration measurements and one crash fixture seed through the API. | Three holdout runs each. Scratch scored 9.6–35.0% and checkpoint-guided `reuse` scored 88.75% each time. |
 | Workbench (`workbench/`) | **Built.** Embedded Codex terminal, `/mcp` endpoint, research library, run comparison, Atlas activity, Run plan and Reject. | Handoff below, including an HTTPS preview. |
-| Crashed-run seed | **Missing.** R1 needs a stored crash that is never offered. | — |
+| Crashed-run seed | **Verified.** The crash is listed and excluded from search. | Live Atlas API checks in the W1 handoff below. |
 | Single-screen UI from the mockup | **Not done.** The workbench has a sidebar with three views and stacked panels. | [docs/demo/index.html](docs/demo/index.html) is the target. |
-| Stability, timing and GPU check | **Not done.** One run each so far, and the install notes use the CPU build of PyTorch. | — |
+| Stability, timing and GPU check | **Passed W1.** All three pairs met the 80% gate on the RTX 3060 Ti. | Guided dispatch took 15.5–24.9 s including Atlas I/O. |
 | Mockup and deck numbers | **Out of date.** They show ResNet-18 on CIFAR-10 and "Claude Code". The build is ResNet-50 on digits with Codex. | — |
 | Rehearsal, fallback, video, submission | **Not done.** | — |
 | Governance in the UI (correct, expire, history) | **Backend built, no UI.** Phase 2. | — |
@@ -37,8 +37,8 @@ Each item has a ready-to-paste prompt in [PROMPTS.md](PROMPTS.md). Paths are own
 | `python -m platform_api.preflight` on event Atlas | Ping, queryable index, embedding round trip. | Reported passed by the teammate. |
 | Live run | Scratch baseline, then agent search, plan, Run plan, `reuse` run, new finding and checkpoint stored. | Reported passed once (29.2% then 90.4%). |
 | Isolation | Second project's search returns nothing, and result, evidence, artifact and decision reads return 404. | Reported for the artifact route. W5 verifies all paths. |
-| Crash never offered | The seeded crash is stored and absent from search. | **Open (W1).** |
-| Stability | Three repeats of the baseline and the guided run land on the same sides of 80%, and the agent proposes `reuse` each time. | **Open (W1, W3).** |
+| Crash never offered | The seeded crash is stored and absent from search. | **Passed (W1).** The crash was listed with evidence and absent from both live searches after all three calibration controls were visible. |
+| Stability | Three repeats of the baseline and the guided run land on the same sides of 80%, and the agent proposes `reuse` each time. | **W1 passed** with scripted plans on the live API. W3 owns the three interactive Codex rehearsals. |
 | Single-screen UI | See W2. | **Open.** |
 | Clean checkout | A fresh clone runs the demo from the documented steps, and the public repo opens signed out. | **Open (W3, W5).** |
 
@@ -64,6 +64,28 @@ Fallbacks, in order: if the agent is unstable, use a scripted planner with the s
 ## Handoffs
 
 Add a short entry with work ID, status, branch or commit, exact check and observed result, and any dependency or next owner. Keep private logs local and link only evidence suitable for the public repo.
+
+### W1 · ResNet seed and CUDA verification
+
+Branch `w1/resnet-calibration`. The CUDA check returned `True` on the NVIDIA GeForce RTX 3060 Ti. Receipts used PyTorch `2.15.0+cu132`, TorchVision `0.29.2+cu132`, and `configuration.device=cuda`.
+
+| Holdout repeat | Scratch accuracy | Scratch elapsed_seconds | Guided `reuse` accuracy | `reuse` elapsed_seconds | `reuse` execute API wall time |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 1 | 20.42% | 2.238 | 88.75% | 0.858 | 24.891 s |
+| 2 | 9.58% | 2.208 | 88.75% | 0.829 | 16.277 s |
+| 3 | 35.00% | 2.170 | 88.75% | 0.775 | 15.526 s |
+
+| Calibration | Accuracy | elapsed_seconds | Observed outcome |
+| --- | ---: | ---: | --- |
+| `reuse`, 64 px | 85.83% | 0.882 | Valid positive with a GridFS checkpoint |
+| `high-lr`, 64 px | 66.67% | 0.719 | Valid negative |
+| `reuse`, 32 px | 87.50% | 0.582 | Valid positive with a GridFS checkpoint, labelled `image_px` mismatch for the 64 px task |
+| Crash fixture, 64 px | null | — | Crashed, invalid, undetermined |
+
+- Ran `python -m platform_api.preflight --out receipts/w1/preflight.json` against the configured Atlas Sandbox. Ping, `research_memory_local_v1`, and the 1536-dimensional BGE embedding query passed. `python -m unittest discover -s tests` passed both tests and `python -m pip check` found no broken dependencies.
+- Ran `python -m experiments.resnet seed` in a fresh Atlas project. `GET /v1/results` listed all four records and the crash evidence route returned the error note. `POST /v1/search` with the demo task and again with the crash's exact hypothesis returned all three completed controls and excluded the crash ID.
+- Ran `python -m experiments.resnet train scratch holdout receipts/w1/scratch.safetensors` three times. For each guided repeat, the local verifier posted a plan to `POST /v1/decisions`, approved it through `POST /v1/decisions/{id}/approve`, and dispatched through `POST /v1/decisions/{id}/execute`. Each receipt cited the same 64 px calibration version and checkpoint SHA-256. All six runs used the 240-example holdout, disjoint from the 240-example calibration evaluation window. All three scratch runs stayed below 80% and all three guided runs passed. The four-epoch budget fit the demo timing target.
+- Reproduce the combined check from the W1 worktree with the configured `.env` and CUDA environment using `python -u -c "import runpy; runpy.run_path('receipts/w1/verify.py', run_name='__main__')"`. The verifier and raw receipts are local. The first seed attempt hit a GridFS 503 with the Sandbox near its storage limit. The repeat passed after clearing the partial W1 seed. To make room for repeated output uploads, the verifier archived and SHA-256-checked its own 32 px and guided output checkpoints locally, then removed their GridFS copies. The active demo project was left untouched. W3 still needs to verify the interactive Codex proposal and browser flow three times and ensure there is room for new checkpoints before rehearsal.
 
 ### Live workspace handoff (from the teammate who built it)
 

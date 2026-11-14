@@ -8,12 +8,17 @@
 
 Use Python 3.11, Node.js, and a signed-in installation of Codex. Set the local Atlas credentials and project tokens as described below.
 
+On the NVIDIA demo workstation, install the CUDA 13.2 builds of PyTorch and TorchVision. Use an NVIDIA driver that supports CUDA 13.2. The availability check should print `True` and the GPU name.
+
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -r requirements-workbench.txt -r requirements-resnet.txt
-.\.venv\Scripts\python.exe -m pip install torch==2.15.0 torchvision==0.29.2 --index-url https://download.pytorch.org/whl/cpu
+.\.venv\Scripts\python.exe -m pip install --no-cache-dir torch==2.15.0+cu132 torchvision==0.29.2+cu132 --index-url https://download.pytorch.org/whl/cu132
+.\.venv\Scripts\python.exe -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.get_device_name() if torch.cuda.is_available() else 'CPU')"
 npm ci
 .\.venv\Scripts\python.exe -m platform_api.preflight
 ```
+
+On a CPU-only machine, use `torch==2.15.0+cpu torchvision==0.29.2+cpu` with `--index-url https://download.pytorch.org/whl/cpu` in the PyTorch install command.
 
 Start the platform in one terminal.
 
@@ -34,7 +39,7 @@ $env:MEMORY_BASELINE_RECEIPT = 'receipts/resnet-baseline.json'
 .\.venv\Scripts\python.exe -m uvicorn workbench.app:app --host 127.0.0.1 --port 8124
 ```
 
-In a third terminal, populate an empty project with measured calibration runs. This downloads the TorchVision ImageNet V1 initialization on first use and uploads two checkpoints. Run this once per project.
+In a third terminal, populate an empty project with three measured calibration runs and one example crash record. This downloads the TorchVision ImageNet V1 initialization on first use and uploads two checkpoints. Run this once per project.
 
 ```powershell
 $env:MEMORY_API_URL = 'http://127.0.0.1:8123'
@@ -43,7 +48,7 @@ $env:MEMORY_API_URL = 'http://127.0.0.1:8123'
 
 Open [the local workspace](http://127.0.0.1:8124). In the Research library, check that the calibration results have appeared. Open the Codex terminal in Workspace. Once the Codex prompt appears, choose **Insert suggested prompt**, then press Enter in the terminal. Review the cited evidence and choose **Run plan**. The trained checkpoint and new finding appear in Run comparison and in the Research library. If Codex is outside PATH, set `MEMORY_CODEX_BIN` to the executable path before starting the workspace.
 
-The Codex terminal connects to the loopback MCP endpoint. The workspace keeps Atlas credentials server-side. The ResNet runner streams the exact checkpoint cited by the plan, checks the SHA-256 before loading it, trains on a split disjoint from calibration, and publishes the observed accuracy and output weights. The locally measured comparison uses four epochs per run. Scratch trains the full model from random initialization, and reuse trains the head with the retrieved backbone frozen, so elapsed times describe the two configurations, including their different trainable parameter counts. The CPU timing covers training and evaluation. GridFS transfer and setup time are outside that metric. The deck's ImageNet and GPU-hour figures are simulated.
+The Codex terminal connects to the loopback MCP endpoint. The workspace keeps Atlas credentials server-side. The ResNet runner streams the exact checkpoint cited by the plan, checks the SHA-256 before loading it, trains on a split disjoint from calibration, and publishes the observed accuracy and output weights. The locally measured comparison uses four epochs per run. Scratch trains the full model from random initialization, and reuse trains the head with the retrieved backbone frozen, so elapsed times describe the two configurations, including their different trainable parameter counts. The receipt records the device in `configuration.device`. The `elapsed_seconds` metric covers training and evaluation. GridFS transfer and setup time are outside that metric. The deck's ImageNet and GPU-hour figures are simulated.
 
 For another experiment, set `MEMORY_EXPERIMENT_MODULE` to its registered profile in both services, or leave it unset to browse, publish, and search findings without a runner. The optional `DEFAULTS` profile dictionary supplies a suggested `question` and task `conditions`. `MEMORY_BASELINE_RECEIPT` is optional.
 
