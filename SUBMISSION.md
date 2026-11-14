@@ -25,8 +25,8 @@ Use the [rehearsal fallbacks](rehearsal/README.md#fallbacks) if the live gates f
 
 ## Submission checklist
 
-- [ ] The repository opens signed out. An anonymous Git fetch could not access the repository on November 14.
-- [ ] Full history secrets scan passes. A focused Git history pattern scan found matching changes only in setup files and .env.example. Confirmed the current URI example is a placeholder and no .env file appeared in reachable history. A dedicated full scan remains open.
+- [ ] The repository opens signed out. W5 confirmed the repository is private, and an anonymous Git fetch failed on November 14.
+- [x] W5 scanned 224 reachable blobs and 59 tracked paths for secret patterns and exact local credential values. Only example Atlas URIs matched. Recheck after further changes before making the repository public.
 - [x] Rehearsal used the configured event Atlas Sandbox. Search index reported READY and Codex retrieved live results over MCP.
 - [ ] Complete three clean live rehearsals, with each successful run under three minutes.
 - [ ] Upload the final voice-over cut and open it signed out.
