@@ -42,6 +42,7 @@ Shared research memory for AI agents, built on MongoDB Atlas. This is the team's
 | R8 | **Expire a finding.** A human expires a different finding. It stops being eligible evidence immediately, even before database cleanup runs, and the UI shows it as expired. | After expiry, B's rerun no longer receives it, and its skip reasons change. The record still appears as Expired in Research and Governance. |
 | R9 | **Rerun after governance.** B reruns the same query after each governance event. Correction and expiry are separate events with separately visible effects. | Four receipts: off, on, after correction, after correction and expiry. |
 | R10 | **Project isolation.** Another project cannot find or read these findings. Required by the hackathon brief. | A second project's search and direct reads return nothing (404). |
+| R12 | **MongoDB does the work, visibly.** Atlas itself enforces isolation, the current-version check, expiry and applicability in one search query, pushes changes to the UI live, and guarantees governance writes. The demo shows each of these as it happens, from the real commands the platform ran. | One `aggregate` per search returns labelled candidates with stale and expired hits already gone. New and changed findings appear in the UI within a second, without a reload. The Atlas activity strip and each stage's “In MongoDB” callout show only real commands. |
 | R11 | **How to rerun.** Each finding's receipt includes the command, fixture and dictionary hashes and library versions needed to reproduce it. | The evidence view shows a rerun command for every measured finding. |
 
 ## Interface
@@ -55,17 +56,22 @@ A polished web app the presenter drives. Judges should not need to explore it th
   - **Governance:** findings to review, Correct and Expire actions, previous and current versions, change history.
   - **Settings:** Atlas connection status, current project, memory on/off, demo environment info, and an isolation check.
 - **Right-hand evidence inspector** that changes with the demo stage.
+- **MongoDB visible throughout:** a live Atlas activity strip on every page showing the real commands as they run, and an “In MongoDB” callout at each Demo stage saying what the database just did (for example: searched by meaning inside this project only, dropped a stale version, hid an expired finding before cleanup, approved exactly once).
 - **Working buttons:** Approve, Reject, Correct, Expire and Re-run all work, and the UI visibly updates.
 
 ## Demo sequence
 
-1. **Agent A discovers.** A publishes a success, a failure and a finding from another cohort.
-2. **MongoDB remembers.** Findings persist in Atlas, and a fresh Agent B retrieves them by meaning.
-3. **Agent B recommends.** Applicable, failed and mismatched evidence are shown, then the recommendation.
-4. **Human approves.** Approve, or reject.
-5. **Agent B executes.** The job runs and the measured result is compared with the baseline.
-6. **Governance.** Correct one finding, rerun; expire another, rerun.
-7. **Updated decision.** Show how the evidence and recommendation changed.
+Each stage names what MongoDB did, shown live from the real commands.
+
+| Stage | What happens | What MongoDB does on screen |
+| --- | --- | --- |
+| 1. Agent A discovers | A publishes a success, a failure, a finding from another cohort, and a crash. | Inserts land and stream into the UI live through change streams. |
+| 2. MongoDB remembers | A fresh Agent B retrieves A's findings by meaning. | Atlas Vector Search, filtered to this project inside the query. |
+| 3. Agent B recommends | Applicable, failed and mismatched evidence, then the recommendation. | The same query checks each hit against the live record and labels the cohort mismatch. |
+| 4. Human approves | Approve, or reject. | An atomic update approves exactly once; a second click is refused. |
+| 5. Agent B executes | The job runs and is compared with the baseline. | Cited versions are re-read right before running; the receipt is stored and streamed. |
+| 6. Governance | Correct one finding and rerun; expire another and rerun. | A transaction keeps v1 in history and makes v2 current. The old search entry is still in the index but the query drops it. Expiry hides the finding instantly; TTL cleanup comes later and nothing waits on it. |
+| 7. Updated decision | How the evidence and recommendation changed. | Each receipt lists the exact versions it read from Atlas. |
 
 ## Out of scope for the hackathon
 
@@ -100,4 +106,5 @@ These come from the original business goals and stay on the roadmap:
 - [ ] A human corrects one finding and expires another, both from the UI.
 - [ ] B reruns the same query after each, and its evidence and recommendation reflect the change.
 - [ ] Another project gets nothing back.
+- [ ] Every Demo stage shows what MongoDB did, from real commands, and findings update live without a reload.
 - [ ] The whole flow is shown through the guided interface in under three minutes.

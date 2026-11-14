@@ -73,7 +73,35 @@ Use 401 for missing or unknown token, 403 for role denial on visible records, 40
 - `MEMORY_ATLAS_URI` and `MEMORY_ATLAS_DB` point to the event Sandbox. `results` holds the authoritative current head keyed by UUID with `project_id`, `author_id`, `version`, `search_key`, normalized fields, inline evidence, `expires_at`, `purge_at` and an `events` array (actor, time, action, version, reason). Each correction copies the current head into `result_versions` and replaces the head, in one transaction conditional on project, current version and active expiry. Manual expiry atomically sets `expires_at` to service time and appends an event. The original publisher keeps ownership.
 - `result_versions` holds superseded payloads and their evidence keyed by `(result_id, version)`, with `project_id` and `purge_at`. Only the history route reads it.
 - `result_vectors` holds immutable search entries keyed by a generated `search_key` with `project_id`, `result_id`, `version`, `embedding`, `embedding_model`, and `purge_at`. Stage the vector before committing the head. A candidate is accepted only if its key and version match the authoritative head. An orphan or old key is inert and eligible for cleanup. The `research_memory_v1` index has a 1536-dimensional cosine vector field `embedding` and a filter field `project_id`. Embed hypothesis, summarized measurement, fixture and conditions using `text-embedding-3-small` at 1536 dimensions, and embed the search question with the same model. Service secrets use `OPENAI_API_KEY`. [Embedding model](https://developers.openai.com/api/docs/models/text-embedding-3-small)
-- Put `$vectorSearch` first with `exact: true`, `limit: 12`, and a `project_id` filter derived from the token. If the Sandbox rejects exact search, use ANN with `numCandidates: 240` and the same filter and limit. Project only candidate keys, versions, IDs and scores. Hydrate from the primary using the authorized project and the service UTC clock. Drop stale, invalid and expired hits, compute applicability for the rest, and return up to eight. Recheck lifecycle at direct read, evidence read, resolve, decision create and receipt. Both projects get their own sentinel in the selectivity test. [Atlas Vector Search](https://www.mongodb.com/docs/vector-search/query/aggregation-stages/vector-search-stage/)
+- **Search is one Atlas aggregation.** MongoDB, not Python, does retrieval, isolation, the stale-version check, expiry and applicability in a single `aggregate` on `result_vectors`. Python only embeds the question and passes the task conditions in. Recheck lifecycle at direct read, evidence read, resolve, decision create and receipt with equivalent `find` filters on `$$NOW`. Both projects get their own sentinel in the selectivity test. [Atlas Vector Search](https://www.mongodb.com/docs/vector-search/query/aggregation-stages/vector-search-stage/) · [$lookup](https://www.mongodb.com/docs/manual/reference/operator/aggregation/lookup/)
+
+```js
+db.result_vectors.aggregate([
+  { $vectorSearch: { index: "research_memory_v1", path: "embedding", queryVector: q,
+      filter: { project_id: P },              // isolation, from the token
+      exact: true, limit: 12 } },             // ANN fallback: numCandidates 240
+  { $addFields: { score: { $meta: "vectorSearchScore" } } },
+  { $lookup: { from: "results", let: { id: "$result_id", v: "$version" }, as: "head",
+      pipeline: [ { $match: { $expr: { $and: [
+        { $eq: ["$_id", "$$id"] }, { $eq: ["$project_id", P] },
+        { $eq: ["$version", "$$v"] },          // stale index entry → no match
+        { $gt: ["$expires_at", "$$NOW"] },     // expired → no match, before TTL runs
+        { $eq: ["$execution", "completed"] }, { $eq: ["$validity", "valid"] } ] } } },
+        { $project: { evidence: 0 } } ] } },
+  { $unwind: "$head" },                        // drops stale, expired and crashed hits
+  { $addFields: { mismatches: { $filter: { as: "m", cond: { $ne: ["$$m.found", "$$m.wanted"] }, input: [
+      { field: "fixture_revision", wanted: C.fixture_revision, found: "$head.fixture_revision" },
+      { field: "cohort", wanted: C.cohort, found: "$head.conditions.cohort" },
+      { field: "codec", wanted: C.codec, found: "$head.conditions.codec" },
+      { field: "dictionary_revision", wanted: C.dictionary_revision, found: "$head.conditions.dictionary_revision" } ] } } } },
+  { $addFields: { applicability: { status: { $cond: [{ $eq: [{ $size: "$mismatches" }, 0] }, "applies", "mismatch"] }, mismatches: "$mismatches" } } },
+  { $limit: 8 }
+])
+```
+
+- **Change streams drive the live UI.** The presenter opens one change stream on `results` and one on `decisions`, each with a `$match` on `fullDocument.project_id` (use `fullDocument: "updateLookup"`). Every publish, correction, expiry, approval and receipt reaches the UI within a second without polling. The UI never reloads to show new findings. [Change streams](https://www.mongodb.com/docs/manual/changeStreams/)
+- **Atlas activity is captured, not described.** The platform registers a PyMongo `CommandListener` that records each command's name, collection, duration in ms, documents returned, and a redacted command shape (query vector shown as `[1536 floats]`, no URIs or tokens). The presenter serves it on `/demo/events`. [Command monitoring](https://pymongo.readthedocs.io/en/stable/api/pymongo/monitoring.html)
+- Preflight confirms the event Sandbox supports `$vectorSearch` with a filter field, `$lookup` after `$vectorSearch`, multi-document transactions, change streams and TTL indexes. If change streams are unavailable on the Sandbox tier, the presenter polls `results` and `decisions` by `updated_at` every 500 ms and the UI labels the panel “polling”.
 - `decisions` holds one document per decision. Approve, reject and receipt are conditional updates on `status`, so a decision can't be approved twice or executed without approval.
 - Expiry hides the record from every agent path immediately. TTL on each collection's BSON Date `purge_at` with `expireAfterSeconds: 0` is asynchronous cleanup: heads and vectors get `expires_at + 24h`, history entries get the head's purge date. Best-effort deletion of a retired vector after correction or expiry can shorten retention. The API stays correct if deletion or TTL lags. [Atlas TTL](https://www.mongodb.com/docs/manual/core/index-ttl/)
 
@@ -124,6 +152,7 @@ P2 owns `uvicorn demo.presenter:app --host 127.0.0.1 --port 8100`. It serves the
 | Route | Does |
 | --- | --- |
 | `GET /demo/state` | Current stage, health from `GET /v1/health`, project, memory setting, findings from `GET /v1/results`, latest decision and receipts. |
+| `GET /demo/events` | Server-sent events: `change` events from the change streams (operation, collection, result or decision ID, version, status) and `atlas` events from the command listener (command, collection, ms, docs, redacted shape). The UI subscribes once on load. |
 | `POST /demo/agent-a` | Runs `benchmark.publish` with A's token. |
 | `POST /demo/agent-b` | `{"memory":"on|off"}`. Runs `benchmark.agent` with B's token. Returns the pending decision. |
 | `POST /demo/rerun` | Repeats B's last request with the same memory setting. |
@@ -146,6 +175,23 @@ P4 owns `demo/web/`, a static HTML, CSS and JavaScript bundle served by the pres
 | Research | Searchable list from `GET /v1/results` with status (current, expired, superseded count), outcome label, execution label, cohort and conditions, and source agent. A detail view shows evidence, the rerun command, provenance and version history. |
 | Governance | Findings to review, Correct and Expire forms with a required reason, the previous and current versions side by side, and the change history. |
 | Settings | Atlas health, project, memory on/off for Agent B, environment info (model, embedding model, zlib version), and the isolation check button with its result. |
+
+**MongoDB on screen.** Two elements make the database's work visible during the whole demo. Both use only live data from `/demo/events`; nothing is hardcoded.
+
+- **Atlas activity strip** along the bottom of every page: the latest commands as they run, for example `aggregate result_vectors · $vectorSearch + $lookup · 4 docs · 38 ms`, `update results · transaction · v1 → v2`, `change stream · results · update`. Clicking a line opens the redacted pipeline in the inspector.
+- **“In MongoDB” callout** at each Demo stage, one sentence built from that stage's real events:
+
+| Stage | What the callout shows |
+| --- | --- |
+| 1 Agent A discovers | Four `insert` commands and their change-stream events arriving; findings appear in the list live. |
+| 2 MongoDB remembers | The `$vectorSearch` aggregate with the `project_id` filter, the paraphrased question, hits and latency. |
+| 3 Agent B recommends | The same pipeline's `$lookup` and applicability stages: which hits matched the live record, and the cohort mismatch computed in the database. |
+| 4 Human approves | The conditional `findOneAndUpdate` from `pending` to `approved`, and the 409 on a second click. |
+| 5 Agent B executes | `resolve` re-reading the cited versions, then the receipt `update` and its change event. |
+| 6 Governance | The correction transaction (head replaced, old version copied to `result_versions`), the expiry `update` of `expires_at`, and the stale index entry still present but dropped by the `$lookup`. TTL `purge_at` shown as future cleanup that nothing waits on. |
+| 7 Updated decision | Side-by-side receipts with the exact versions each run read from Atlas. |
+
+Settings shows the isolation check as two real commands: the same `$vectorSearch` with the other project's filter returning nothing, and the direct `find` returning no document.
 
 A right-hand evidence inspector follows the current stage or selection: conditions first, then outcome labels (execution, validity, direction), metric and threshold, evidence receipt with the rerun command, applicability, provenance and version. For a decision it shows the cited versions, skipped jobs, ruled-out findings, approval and the receipt. Use distinct text labels for a valid negative, a crash and a mismatch. Show conditions before the outcome. Support keyboard use, visible focus, and loading, empty and error states. On narrow screens the inspector stacks below.
 
