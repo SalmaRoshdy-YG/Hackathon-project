@@ -8,6 +8,7 @@ from pymongo.errors import OperationFailure
 from pymongo.operations import SearchIndexModel
 
 from platform_api.activity import Activity
+from platform_api.artifacts import Artifacts
 from platform_api.config import utcnow
 from platform_api.embedding import DIMENSIONS, embed, index_name, model
 
@@ -30,6 +31,7 @@ def active():
 
 def public(doc):
     return {**{k: doc[k] for k in PUBLIC}, "result_id": doc.get("result_id", doc["_id"]),
+            "artifact": doc.get("artifact"),
             "status": doc.get("status", "current")}
 
 
@@ -69,6 +71,7 @@ class Store:
         kwargs = {"event_listeners": [Activity(bus, database)]} if bus else {}
         self.client = MongoClient(uri, tz_aware=True, timeoutMS=15000, serverSelectionTimeoutMS=7500, **kwargs)
         self.db = self.client[database]
+        self.artifacts = Artifacts(self.db)
 
     def setup(self):
         for name in ("results", "result_versions", "result_vectors"):
@@ -154,6 +157,8 @@ class Store:
         if identity.role not in {"maintainer", "publisher"}:
             error(403, "publish_denied")
         payload = body.model_dump()
+        if body.artifact:
+            self.artifacts.check(identity, body.artifact)
         result_id = str(uuid4())
         search_key = self.stage(identity, payload, result_id, 1)
         now = utcnow()
@@ -223,7 +228,7 @@ class Store:
             {"$set": {"score": {"$meta": "vectorSearchScore"}}},
             {"$lookup": {"from": "results", "let": {"id": "$result_id", "version": "$version", "key": "$_id"},
                          "as": "head", "pipeline": [{"$match": {"$expr": {"$and": joins}}},
-                                                    {"$project": {**dict.fromkeys(PUBLIC, 1), "_id": 1}}]}},
+                                                    {"$project": {**dict.fromkeys(PUBLIC, 1), "_id": 1, "artifact": 1}}]}},
             {"$unwind": "$head"},
         ]
         if conditions is None:

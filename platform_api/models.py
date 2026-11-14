@@ -80,6 +80,15 @@ class Source(Body):
     record: Tag
 
 
+Digest = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
+
+
+class Artifact(Body):
+    sha256: Digest
+    filename: Annotated[str, StringConstraints(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,119}$")]
+    bytes: Annotated[int, Field(gt=0)]
+
+
 class Publish(Body):
     schema_version: Literal[1]
     hypothesis: Text
@@ -93,6 +102,7 @@ class Publish(Body):
     evidence: Evidence
     source: Source
     expires_at: AwareDatetime
+    artifact: Artifact | None = None
 
     @model_validator(mode="after")
     def measured_direction(self):

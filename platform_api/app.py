@@ -4,19 +4,21 @@ import os
 from time import monotonic
 import asyncio
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pymongo.errors import PyMongoError
+from pydantic import ValidationError
 import httpx
 
 from platform_api.activity import Events, scope
 from platform_api.config import identities
 from platform_api.decisions import Decisions, outward
 from platform_api.embedding import model
-from platform_api.models import Approve, Correct, Expire, Proposal, Publish, Reject, Resolve, ResultID, Search
+from platform_api.artifacts import CHUNK
+from platform_api.models import Approve, Artifact, Correct, Expire, Proposal, Publish, Reject, Resolve, ResultID, Search
 from platform_api.profile import experiment
 from platform_api.store import Store, error, public
 
@@ -92,6 +94,35 @@ def publish(request: Request, body: Publish, who=Principal):
 @app.get("/v1/results")
 def results(request: Request, who=Principal):
     return {"items": [public(d) for d in request.app.state.store.all_heads(who)]}
+
+
+@app.post("/v1/artifacts", status_code=201)
+def upload_artifact(request: Request, upload: UploadFile = File(), who=Principal):
+    try:
+        return request.app.state.store.artifacts.put(who, upload.filename, upload.file)
+    except ValidationError:
+        error(422, "invalid_artifact")
+
+
+@app.get("/v1/results/{result_id}/artifact")
+def download_artifact(request: Request, result_id: ResultID, version: int = Query(gt=0), who=Principal):
+    store = request.app.state.store
+    result = store.visible(who, result_id, version)
+    if not result.get("artifact"):
+        error(404, "artifact_not_found")
+    artifact = Artifact.model_validate(result["artifact"])
+    file = store.artifacts.open(who, artifact)
+
+    def stream():
+        with file:
+            while block := file.read(CHUNK):
+                yield block
+
+    return StreamingResponse(stream(), media_type="application/octet-stream", headers={
+        "Content-Length": str(artifact.bytes),
+        "Content-Disposition": f'attachment; filename="{artifact.filename}"',
+        "X-Artifact-SHA256": artifact.sha256,
+    })
 
 
 @app.post("/v1/search")

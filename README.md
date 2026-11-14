@@ -6,39 +6,44 @@ AI agents save what worked and what failed on MongoDB Atlas, along with the mode
 
 ## The demo in one minute
 
-Task: fine-tune a ResNet-18 to 90% on CIFAR-10 in one run of about two GPU-minutes, on our own GPU.
+Task: train a ResNet-50 to at least 80% accuracy on a handwritten-digit holdout in one four-epoch run, on our own machine.
 
-1. **Past experiments.** Other agents tried things: fine-tuning from ImageNet weights worked, a high learning rate from scratch diverged, a Fashion-MNIST result doesn't fit, one run crashed.
-2. **Ask Claude Code**, in a terminal embedded in the page. It searches the memory through MCP tools. The experiments it uses, avoids and sets aside light up.
-3. **You decide.** It proposes a plan citing exact versions. You say "Run it" or "Not now".
-4. **Result.** It loads the stored weights, trains, and beats Claude Code on its own (about 93% against about 71%). The result is saved back as a new experiment.
+1. **Past experiments.** Other agents tried things: reusing an ImageNet-initialised checkpoint worked, a very high learning rate failed, a result at a different image size doesn't fit, and one run crashed.
+2. **The agent searches.** Codex, in a terminal embedded in the page, searches the memory through MCP tools. The experiments it uses, avoids and sets aside light up.
+3. **You decide.** It proposes a plan citing exact versions. You press **Run plan** or **Reject**.
+4. **Result.** It loads the stored checkpoint, trains, and beats the same agent on its own (measured once: 90.4% against 29.2%). The result and new checkpoint are saved back as a new experiment.
 
-MongoDB does the work and shows it: one aggregate for search, atomic approval, GridFS for weights, change streams to the screen.
+MongoDB does the work and shows it: one aggregate for search, atomic approval, GridFS for checkpoints, change streams to the screen.
 
 ## What is built and what is not
 
 | | State |
 | --- | --- |
-| Atlas platform: search, versions, expiry, decisions, command listener (`platform_api/`) | Built, live Atlas verification pending. See [BACKEND.md](BACKEND.md). |
-| Presenter service (`demo/presenter.py`) | Built for a scripted agent path. Embedded terminal not yet. |
-| ResNet benchmark, MCP server, weights routes | Not started. |
-| Web UI | Mockup only. |
-| Governance (correct, expire, history) | Built in the backend. Not on the demo path yet (Phase 2). |
+| Atlas platform: search, versions, expiry, decisions, GridFS artifacts (`platform_api/`) | Built. A teammate reports it verified live on the event Sandbox. |
+| ResNet-50 digits experiment (`experiments/resnet.py`) | Built. Crashed-run seed missing. |
+| Workbench: embedded Codex terminal, `/mcp`, research library, run comparison (`workbench/`) | Built. Not yet the single-screen design. |
+| Pitch mockup and deck | Out of date: still show ResNet-18 on CIFAR-10. |
+| Governance (correct, expire, history) | Backend only. Phase 2. |
 
-Current status and owners: [TASKS.md](TASKS.md).
+Status, open work and owners: [TASKS.md](TASKS.md). Ready-to-paste prompts for parallel agents: [PROMPTS.md](PROMPTS.md).
+
+## Run it
+
+[BACKEND.md](BACKEND.md#live-workspace) has the exact steps: install, start the platform and workbench, record the baseline, seed the memory, open the workspace.
 
 ## Look at it
 
-- **Clickable mockup:** open [docs/demo/index.html](docs/demo/index.html) in a browser. One screen, four stages, simulated terminal and numbers. All numbers are illustrative until measured on the GPU PC.
-- **Pitch deck:** [docs/deck/precedent-deck.pptx](docs/deck/precedent-deck.pptx), 12 slides with speaker notes. Statistics on slide 2 are cited on the slide. Numbers elsewhere are illustrative.
+- **Clickable mockup:** open [docs/demo/index.html](docs/demo/index.html) in a browser. One screen, four stages, simulated terminal and numbers. It is the design target for the workbench UI. Its task and numbers are being updated to match the real build.
+- **Pitch deck:** [docs/deck/precedent-deck.pptx](docs/deck/precedent-deck.pptx), 12 slides with speaker notes. Statistics on slide 2 are cited on the slide. Numbers elsewhere are illustrative and being updated.
 
 ## Read in this order
 
 | File | What it is |
 | --- | --- |
 | [REQUIREMENTS.md](REQUIREMENTS.md) | The agreed MVP in plain words, requirements, interface, scope and decisions. |
-| [PLATFORM.md](PLATFORM.md) | The contract: results, routes, Atlas storage, benchmark, Claude Code integration, UI, credits. |
-| [BACKEND.md](BACKEND.md) | How to run and verify the Atlas backend and the presenter. |
+| [PLATFORM.md](PLATFORM.md) | The contract: results, routes, Atlas storage, benchmark, agent integration, UI, credits. |
+| [BACKEND.md](BACKEND.md) | How to run and verify the Atlas backend and the live workspace. |
+| [PROMPTS.md](PROMPTS.md) | Prompts to start the open work in parallel. |
 | [TASKS.md](TASKS.md) | Owners, gates, time plan and demo script. |
 | [HARNESS.md](HARNESS.md) | The order of integration and the evidence the demo must show. |
 | [HUMANS.md](HUMANS.md) | How a reviewer checks the claims. |
@@ -53,4 +58,4 @@ Open the checkout, claim a task on the [team board](TASKS.md), substitute your t
 
 ## Credits
 
-Ideas from ARA and AutoSci (no code used), PyTorch and torchvision as libraries. See [NOTICE.md](NOTICE.md).
+Ideas from ARA and AutoSci (no code used), PyTorch, torchvision and scikit-learn as libraries. See [NOTICE.md](NOTICE.md).

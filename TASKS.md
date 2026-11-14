@@ -1,69 +1,73 @@
 # Team task board
 
-Claim a role by adding your name. P4 is integration lead and submitter, and owns this board. Each owner edits only their own paths, on a branch. P1 owns changes to the [platform contract](PLATFORM.md) and coordinates them with affected owners. What we're building and why is in [REQUIREMENTS.md](REQUIREMENTS.md). The demo task is ResNet-18 on CIFAR-10 on the team's GPU PC.
+What we're building and why is in [REQUIREMENTS.md](REQUIREMENTS.md). The contract is [PLATFORM.md](PLATFORM.md). Parallel-agent prompts for the open work are in [PROMPTS.md](PROMPTS.md). Submission is due **5:00 p.m. Toronto time**.
 
 ## Where we are
 
 | Piece | State | Evidence |
 | --- | --- | --- |
-| Atlas platform (`platform_api/`) | **Built, not verified live.** Single `$vectorSearch` + `$lookup` aggregation, versions, expiry, decisions with atomic approve and one dispatch, command listener. | Code on `main`. Offline: `python -m unittest discover -s tests`. Live Atlas checks below are pending. |
-| Presenter (`demo/presenter.py`) | **Built for a scripted agent path**, with change streams and `/demo/events`. No embedded terminal yet. | Code on `main`. Live check pending. |
-| ResNet benchmark and experiment profile | **Not started.** The old compression benchmark and the digit demo were removed. | — |
-| MCP server for Claude Code, weights routes (GridFS) | **Not started.** | — |
-| Web UI (`demo/web/`) | **Mockup only.** | [docs/demo/index.html](docs/demo/index.html), single-screen, illustrative numbers. |
-| Pitch deck | Updated to the ResNet-18 task and four stages. | [docs/deck/precedent-deck.pptx](docs/deck/precedent-deck.pptx) |
+| Atlas platform (`platform_api/`) | **Built and reported verified live** by a teammate: preflight, unit tests, isolation, GridFS artifacts. | Handoff below. Not re-run by the reviewer. |
+| ResNet-50 digits experiment (`experiments/resnet.py`) | **Built.** `seed` publishes three calibration experiments, `train` runs a job, the profile plugs into the platform. | Scratch 29.2% against `reuse` 90.4% on the holdout, once. |
+| Workbench (`workbench/`) | **Built.** Embedded Codex terminal, `/mcp` endpoint, research library, run comparison, Atlas activity, Run plan and Reject. | Handoff below, including an HTTPS preview. |
+| Crashed-run seed | **Missing.** R1 needs a stored crash that is never offered. | — |
+| Single-screen UI from the mockup | **Not done.** The workbench has a sidebar with three views and stacked panels. | [docs/demo/index.html](docs/demo/index.html) is the target. |
+| Stability, timing and GPU check | **Not done.** One run each so far, and the install notes use the CPU build of PyTorch. | — |
+| Mockup and deck numbers | **Out of date.** They show ResNet-18 on CIFAR-10 and "Claude Code". The build is ResNet-50 on digits with Codex. | — |
+| Rehearsal, fallback, video, submission | **Not done.** | — |
+| Governance in the UI (correct, expire, history) | **Backend built, no UI.** Phase 2. | — |
 
-## Workstreams
+## Open work
 
-| ID | Workstream | Owner | Status | First task and pass condition |
+Each item has a ready-to-paste prompt in [PROMPTS.md](PROMPTS.md). Paths are owned by one item at a time so agents can work in parallel without edit conflicts.
+
+| ID | Work | Owns | Depends on | Pass condition |
 | --- | --- | --- | --- | --- |
-| P1 | Platform and Atlas | Open | Verify, then extend | Run `python -m platform_api.preflight` against the event Sandbox. Pass when the vector index is queryable, one 1536-float embedding round trips, and each project retrieves only its own sentinel. Then add the GridFS weights routes (`GET`/`POST /v1/results/{id}/weights`) with the same lifecycle rules as evidence. |
-| P2 | Presenter and terminal | Open | Extend | Add the embedded terminal: xterm.js over a localhost WebSocket to a PTY in the demo working directory, as in [PLATFORM.md](PLATFORM.md#claude-code-integration). Pass when `claude` starts inside the page, `/demo/events` still streams, and no token reaches the browser. Keep the scripted path as the fallback. |
-| P3 | Benchmark and Claude Code | Open | Not started | Build `benchmark/` on the GPU PC per [PLATFORM.md](PLATFORM.md#benchmark): `benchmark.run`, `benchmark.publish`, `benchmark.execute`, the `benchmark.profile` experiment module and the calibration. Then `platform_api/mcp.py` with the six tools and the demo folder's `.mcp.json`. Pass when the calibration gate holds (baseline well under 90%, `finetune-lr0.01` over 90% in under two minutes, `scratch-lr0.4` diverges, batch 4096 crashes) and `claude` in the demo folder lists the six tools. |
-| P4 | UI, integration and demo | Open | Mockup done | Turn [docs/demo/index.html](docs/demo/index.html) into `demo/web/` wired to `/demo/state` and `/demo/events`. Keep it one screen. Pass when the four stages run from real events, the Atlas strip shows only real commands, and "Not now" leaves no run. Then own clean-checkout rehearsal, the baseline recording, the one-minute video and submission. |
+| W1 | Seed completeness, calibration, stability and GPU | `experiments/`, `receipts/` (local), BACKEND install notes | — | A crashed run is seeded and never returned by search. Three consecutive scratch and `reuse` runs on the demo machine give stable results on the right side of 80%. Training time is recorded. PyTorch uses the GPU. |
+| W2 | Single-screen UI | `workbench/web/` | — | The four stages run from real events on one screen, highlights show used, avoided and doesn't fit, the result card shows both runs, and "Reject" leaves no run. |
+| W3 | Rehearsal, fallback, video, submission | `rehearsal/`, `SUBMISSION.md` | W1 numbers, W2 for the video | Three clean full runs under three minutes, a labelled fallback, a one-minute video script and a checked submission list. |
+| W4 | Pitch alignment | `docs/demo/`, `docs/deck/` | W1 numbers (start now with 29.2% and 90.4%) | Mockup and deck show ResNet-50 on digits, Codex, the real job names and measured numbers. |
+| W5 | Verify and harden | `tests/`, `.github/`, `platform_api/` fixes only | — | All checks pass and are recorded. Secrets scan is clean. Cross-project reads of results, artifacts and decisions fail. Approval runs once. |
+| W6 | Governance in the UI (Phase 2) | `workbench/` correct and expire controls | W2 | Only after W1–W5 pass. Correct and expire an experiment from the UI and ask again. |
 
 ## Verification gates
 
-| Owner | Check | Pass condition | Status |
-| --- | --- | --- | --- |
-| P1 | `python -m unittest discover -s tests` | Passes offline. | Not run by the reviewer. |
-| P1 | `python -m platform_api.preflight` on event Atlas | Ping, index queryable, embedding round trip. | **Pending, needs Sandbox access.** |
-| P1 | `python -m demo.check_platform` | Isolation (two projects find only their own sentinel, cross-project reads return 404), search returns labelled hits, a crash is never returned, stale vector hits are dropped. | **Pending.** |
-| P1 | MongoDB does the work | The command log shows exactly one `aggregate` on `result_vectors` per search with `$vectorSearch` filtered by project and a `$lookup`. | **Pending.** |
-| P2 | `python -m demo.check_presenter` | Approve and reject work once (409 after). Tokens never reach the browser. `change` and `atlas` events arrive within a second. | **Pending.** |
-| P3 | Calibration | See the P3 row. Numbers recorded with GPU name and library versions. Replace the mockup numbers. | **Pending.** |
-| P3 | Claude Code through MCP | `claude` lists six tools in the demo folder and none outside it. A search highlights the right experiments within a second. Declining leaves no run. Accepting runs once. `load_weights` refuses an expired or superseded result. | **Pending.** |
-| P3 + P4 | Full run | Same request and budget: baseline picks `scratch-lr0.1` (about 71%). With Precedent it cites the positive and the failed run, sets aside Fashion-MNIST, runs `finetune-lr0.01` (about 93%). Repeat three times. | **Pending.** |
-| P4 | Clean checkout | `python -m pip install -r requirements.txt` works, the demo runs from a fresh clone with local env values, the public repo opens signed out. | **Pending.** |
+| Check | Pass condition | Status |
+| --- | --- | --- |
+| `python -m unittest discover -s tests` | Passes offline. | Passed offline on the reviewer's machine (2 tests). The teammate reports it passing in their environment. |
+| `python -m platform_api.preflight` on event Atlas | Ping, queryable index, embedding round trip. | Reported passed by the teammate. |
+| Live run | Scratch baseline, then agent search, plan, Run plan, `reuse` run, new finding and checkpoint stored. | Reported passed once (29.2% then 90.4%). |
+| Isolation | Second project's search returns nothing, and result, evidence, artifact and decision reads return 404. | Reported for the artifact route. W5 verifies all paths. |
+| Crash never offered | The seeded crash is stored and absent from search. | **Open (W1).** |
+| Stability | Three repeats of the baseline and the guided run land on the same sides of 80%, and the agent proposes `reuse` each time. | **Open (W1, W3).** |
+| Single-screen UI | See W2. | **Open.** |
+| Clean checkout | A fresh clone runs the demo from the documented steps, and the public repo opens signed out. | **Open (W3, W5).** |
 
-Mark each gate with the commit, the exact command and the observed result as soon as it passes. Anything checked only against a stub or a fixture must say so.
-
-## Handoff between producers and callers
-
-- The benchmark writes a single-run JSON receipt: `run_id`, `fixture_revision`, `conditions`, `configuration`, `metric`, `execution`, `validity`, `direction`, `train_seconds`, `gpu`, `weights_sha256` and `reproduce` (`command`, `seed`, library versions). Conditions, configuration and metric match the publish body.
-- `python -m benchmark.publish` publishes the seeded experiments and uploads weights, then exits. Its output names the refs `positive`, `negative`, `mismatch` and `crash`.
-- The baseline is recorded once before the demo: Claude Code run in an empty folder with no `.mcp.json`, same prompt, receipt saved to `receipts/baseline.json`. It never touches the platform.
+Mark each gate with the commit, exact command and observed result when it passes. A check against a stub or fixture must say so.
 
 ## Time plan to the 5:00 p.m. submission
 
-Adjust to the actual clock. Protect the submission.
-
 | By | Goal |
 | --- | --- |
-| Now | P1 runs preflight on event Atlas. P3 starts the GPU calibration. P4 starts `demo/web/` from the mockup. |
-| 3:15 | Calibration done, seeded experiments published, real Atlas search returns labelled hits. |
-| 3:45 | MCP tools and the embedded terminal work. One full run: ask, propose, confirm, train, result saved. |
-| 4:15 | Freeze. Three clean rehearsals. If the UI or the terminal isn't ready, present the working parts and the scripted path, and say which is which. |
+| Now | W1, W2, W4 and W5 start in parallel. |
+| 3:45 | W1 done with real numbers. W2 shows the four stages from real events. W4 has the new mockup and deck text. |
+| 4:15 | Freeze. W3 runs three clean rehearsals. If the UI isn't ready, present the working workbench and say so. |
 | 4:15–4:30 | Record the one-minute video. Check it opens signed out. |
 | 4:30 | Submit with the public repo, the video and all team members. Leave 30 minutes for recovery. |
 
-Fallbacks, in order: if Claude Code is unstable, use the scripted planner with the same evidence rules and label it. If the PTY fails, run Claude Code in a normal terminal beside the browser. If Atlas is unavailable late, show verified receipts from an earlier real run and say so. Do not add Phase 2 governance to the live demo until all gates above pass.
+Fallbacks, in order: if the agent is unstable, use a scripted planner with the same evidence rules and label it. If the embedded terminal fails, run the agent in a normal terminal beside the browser. If Atlas is unavailable late, show verified receipts from an earlier real run and say so. Do not add Phase 2 governance to the live demo until the gates pass.
 
-## Demo sequence
+## Demo script
 
-- **One-minute recording.** Keep the Atlas strip in frame. 0–10s past experiments, including the crash and the stored weights. 10–25s ask Claude Code, with its picks lighting up (using, avoiding, doesn't fit). 25–35s the plan and "Run it". 35–50s training, then the result next to Claude Code on its own. 50–60s the new experiment in the list and the public repo.
-- **Three-minute live demo.** Four stages, one "In MongoDB" sentence each. 0–25s past experiments. 25–80s ask Claude Code and point at the highlights, including the one that doesn't fit. 80–110s the plan and "Run it" (show "Not now" first if time allows). 110–160s training and the result against the baseline, and the new experiment. 160–180s isolation: another project gets nothing back. Keep the end for questions. Governance (correct and expire) is a talking point, not part of the run, until Phase 2 lands.
+- **One-minute video.** Keep the Atlas strip in frame. 0–10s past experiments, including the crash and the stored checkpoint. 10–25s the agent searches and its picks light up (using, avoiding, doesn't fit). 25–35s the plan and "Run plan". 35–50s training, then the result next to the agent on its own. 50–60s the new experiment in the list and the public repo.
+- **Three-minute live demo.** Four stages, one "In MongoDB" sentence each. 0–25s past experiments. 25–80s the agent searches, point at the highlights including the one that doesn't fit. 80–110s the plan, Reject once to show nothing runs, then Run plan. 110–160s training and the result against the baseline, and the new experiment. 160–180s isolation: another project gets nothing back. Governance (correct, expire) is a talking point until Phase 2 lands.
 
 ## Handoffs
 
-Add a short entry with task ID, status, branch or commit, exact check and observed result, and any dependency or next owner. Keep private logs local and link only evidence suitable for the public repo.
+Add a short entry with work ID, status, branch or commit, exact check and observed result, and any dependency or next owner. Keep private logs local and link only evidence suitable for the public repo.
+
+### Live workspace handoff (from the teammate who built it)
+
+- Started from `main` at `fd3a73b`. The [live workspace startup and training steps](BACKEND.md#live-workspace) run the Codex terminal, Atlas-backed research library, and run comparison.
+- Ran `python -m experiments.resnet seed` and `python -m experiments.resnet train scratch holdout receipts/resnet-baseline.safetensors`. The scratch run measured 29.2% on the holdout. Codex searched Atlas through MCP and produced a plan citing a compatible calibration result. After browser confirmation the ResNet job measured 90.4% on the same holdout, published a finding, and saved the weights to GridFS. Verified the output byte count and SHA-256 through the download route and a 404 for the second project.
+- Passed `python -m platform_api.preflight`, `python -m unittest discover -s tests`, `python -m tests.check_standalone`, and `python -m tests.check_lookup_profile`. The lookup test used its own job catalog and fixture, with 122 comparisons for the baseline and 7 with memory.
+- Verified the HTTPS preview from a browser, including sign-in, blocked anonymous API reads, blocked external MCP, the run comparison and the Codex terminal over WebSocket.
