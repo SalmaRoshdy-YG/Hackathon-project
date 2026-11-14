@@ -65,6 +65,11 @@ Fallbacks, in order: if the agent is unstable, use a scripted planner with the s
 
 Add a short entry with work ID, status, branch or commit, exact check and observed result, and any dependency or next owner. Keep private logs local and link only evidence suitable for the public repo.
 
+### W3 · Gabriel Peralta · Rehearsal in progress
+
+Branch w3/rehearsal from main at 968b924. Ran the real CUDA scratch baseline and Atlas workbench. Codex proposed reuse through MCP in both the embedded terminal and the normal-terminal fallback. Browser Reject left no receipt. Browser Run plan ended runner_failed after 124.2 seconds from browser launch, with no new finding. Fresh-project seed failed on POST /v1/artifacts with HTTP 503. Three complete runs remain open.
+
+The outside-platform scratch run scored 19/240 (7.9%; 2.824 s). The exact checkpoint cited by Codex was downloaded from GridFS and SHA-256 verified. Running the same four-epoch holdout trainer locally with those weights scored 216/240 (90.0%; 1.066 s). Training timings exclude setup and transfers. See rehearsal/README.md for commands and SUBMISSION.md for the recording script. Local captures and receipts are under receipts/w3/.
 ### W1 · ResNet seed and CUDA verification
 
 Branch `w1/resnet-calibration`. The CUDA check returned `True` on the NVIDIA GeForce RTX 3060 Ti. Receipts used PyTorch `2.15.0+cu132`, TorchVision `0.29.2+cu132`, and `configuration.device=cuda`.
