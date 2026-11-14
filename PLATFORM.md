@@ -146,6 +146,27 @@ P3 owns:
 
 B reads its token from `MEMORY_TOKEN`. Receipts include request, model, catalog and budget, candidates with applicability, selected and skipped jobs, exact used refs, approval, executed configuration, runtime, status, metric, byte counts, hashes and round-trip evidence. The planning arithmetic above came from a local Python 3.11 standard-library probe. Build acceptance requires receipts from the new runner.
 
+## Claude Code integration
+
+Claude Code is the agent in the loop. It never talks to Atlas directly; it uses the platform through an MCP server, so every rule in this contract applies to it.
+
+P3 owns `python -m platform_api.mcp` (stdio MCP server), registered for Claude Code in the demo working directory’s `.mcp.json`. It holds the reader token for the person’s project and the session identity for approvals. Tools:
+
+| Tool | Calls | Notes |
+| --- | --- | --- |
+| `search_experiments(question, conditions)` | `POST /v1/search` | Returns candidates with applicability labels. Crashed, expired and superseded results never come back. |
+| `get_experiment(result_id, version?)` | `GET /v1/results/{id}` and `/evidence` | Current versions only. |
+| `propose_plan(job, used_refs, avoided_refs, set_aside_refs, reason)` | `POST /v1/decisions` | Stores the plan as `pending`. The decision document’s cited, avoided and set-aside refs are what the UI highlights, pushed by the `decisions` change stream. |
+| `run_plan(decision_id)` | `POST /v1/decisions/{id}/approve`, then the runner | Not in Claude Code’s allowed tools, so Claude Code’s permission prompt asks the person first. That confirmation is the approval; the MCP server records it with the person’s identity. “Not now” calls `/reject`. |
+| `load_weights(result_id)` | `GET /v1/results/{id}/weights` | Streams the GridFS file after the same lifecycle check as resolve. Packaged weights (for example `torchvision` `ResNet50_Weights.IMAGENET1K_V1`) are recorded as the source on the result. |
+| `publish_result(body, decision_id)` | `POST /v1/results` | Publishes the run as a new experiment, linked to the decision and the versions it used. |
+
+New route for weights: `GET /v1/results/{id}/weights?version=` → 200 streamed file with `X-Weights-SHA256`, from GridFS bucket `weights` (`fs.files` metadata carries `project_id`, `result_id`, `version`, `source`). Same 404 rules as evidence. Publishing may attach weights by upload to `POST /v1/results/{id}/weights` (publisher or maintainer).
+
+**Embedded terminal.** The presenter serves an xterm.js panel connected over a localhost WebSocket (`/demo/terminal`) to a PTY on the presenter’s machine, started in the demo working directory, where the person runs `claude`. It is the person’s own terminal shown inside the page: nothing in the browser holds tokens, and the PTY is only reachable from localhost. If the PTY fails during judging, run Claude Code in a normal terminal beside the browser; the highlights and results still appear through change streams.
+
+The baseline is the same `claude` session started outside the demo directory, with no `.mcp.json`, so it has no Precedent tools.
+
 ## Presenter service
 
 P2 owns `uvicorn demo.presenter:app --host 127.0.0.1 --port 8100`. It serves the UI at `/`, holds the four tokens server-side, and calls the platform API and P3's commands. The browser only talks to the presenter. It binds to localhost.
@@ -162,6 +183,7 @@ P2 owns `uvicorn demo.presenter:app --host 127.0.0.1 --port 8100`. It serves the
 | `POST /demo/governance/correct` | `{"result_id":…,"expected_version":…,"reason":…}`. Uses the prepared cohort B replacement from P3's receipt. |
 | `POST /demo/governance/expire` | `{"result_id":…,"expected_version":…,"reason":…}`. |
 | `GET /demo/results/{id}/history` | Forwards the history route. |
+| `GET /demo/terminal` | WebSocket to the embedded terminal’s PTY. Localhost only. |
 | `POST /demo/isolation-check` | Runs the same search and a direct read with the second project's token and returns both responses (expect no candidates and 404). |
 
 `python -m demo.reset --project demo-live` clears the demo project before a presentation.
@@ -172,7 +194,7 @@ P4 owns `demo/web/`, a static HTML, CSS and JavaScript bundle served by the pres
 
 | Page | Contents |
 | --- | --- |
-| Demo (default) | Six stages from the demo sequence, with a Next button the presenter controls. Each stage shows agent activity and the evidence cards for that step. Stage 2 shows Agent B's question and groups candidates as applicable success, applicable failure, and doesn't match, with the mismatched field named. Stage 3 has Approve and Reject. Stage 4 shows the measured result against the baseline and the 0.40 target. Stage 5 has Correct and Expire buttons and a Re-run after each. Stage 6 shows the four receipts side by side. |
+| Demo (default) | Six stages from the demo sequence, with a Next button the presenter controls. Stages 2–5 show the experiment list beside the embedded terminal. When Claude Code proposes a plan, its cited, avoided and set-aside experiments are highlighted (used, avoiding, doesn’t fit, with the mismatched field named). Stage 3 is the person’s confirmation in the terminal (Run it or Not now). Stage 4 shows the result beside “Claude Code on its own” and the new experiment in the list. Stage 5 has Correct and Expire and asks Claude Code again after each. Stage 6 shows the four runs side by side. |
 | Research | Searchable list from `GET /v1/results` with status (current, expired, superseded count), outcome label, execution label, cohort and conditions, and source agent. A detail view shows evidence, the rerun command, provenance and version history. |
 | Governance | Findings to review, Correct and Expire forms with a required reason, the previous and current versions side by side, and the change history. |
 | Settings | Atlas health, project, agents in the project, how the baseline was recorded, environment info (model, embedding model, zlib version), and the isolation check button with its result. |
