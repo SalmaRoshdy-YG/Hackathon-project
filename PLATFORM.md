@@ -1,16 +1,26 @@
 # Platform contract
 
-Agent A publishes measured outcomes. A fresh Agent B uses event Atlas Vector Search to discover prior experiments, checks the conditions, and chooses a CPU job. Corrections and expiry change which evidence it can use. The same contract can support more agents and benchmarks through project membership, versioned results, and new job catalogs.
+This is the technical contract for [REQUIREMENTS.md](REQUIREMENTS.md) (R1–R11). One live research handoff on a fast CPU benchmark: Agent A publishes measured findings, a fresh Agent B finds them through event Atlas Vector Search, the platform labels which ones apply, B recommends a job, a human approves, the job runs, and human corrections and expiry change B's next recommendation. The same contract can support more agents and studies later through project membership, versioned results, and new job catalogs.
+
+We build our own platform. No ARA or AutoSci code, runtime or adapter is on the build path. See [Credits](#credits).
 
 ## Shared entry point
 
-Use Python 3.11, FastAPI and PyMongo. P1 owns `uvicorn platform_api.app:app --host 127.0.0.1 --port 8000` and the HTTP JSON contract below. P2 and P3 can exercise their callers against a stub serving these payloads. P4 owns the top-level rehearsal. All commands in this plan are implementation targets.
+Use Python 3.11, FastAPI and PyMongo. P1 owns `uvicorn platform_api.app:app --host 127.0.0.1 --port 8000` and the HTTP JSON contract below. P2 owns the presenter service that serves the UI and drives the demo (see [Presenter service](#presenter-service)). Callers can work against a stub serving these payloads until the real service is up. P4 owns the top-level rehearsal. All commands in this plan are implementation targets.
 
-The service maps opaque bearer tokens in server-side `MEMORY_TOKENS_JSON` to a trusted `project_id`, `agent_id`, and `role`. Example mapping entry: `{"<publisher-token>":{"project_id":"team-run-01","agent_id":"agent-a","role":"publisher"}}`. Issue a publisher token for A, a reader for B, a maintainer for corrections, and equivalent test identities in a second project for isolation. Rehearsals use fresh project IDs in the same Atlas database and index. The harness passes each process only its own token. Atlas and provider credentials stay with the service and trusted runner as applicable. Source metadata is attribution. The service sets project and author from the token and rejects caller-supplied identity fields. Readers can read and resolve usable project records. Publishers also publish and can correct or expire their own records. Maintainers can publish, correct, and expire within their project.
+The service maps opaque bearer tokens in server-side `MEMORY_TOKENS_JSON` to a trusted `project_id`, `agent_id`, and `role`. Example mapping entry: `{"<publisher-token>":{"project_id":"team-run-01","agent_id":"agent-a","role":"publisher"}}`. Issue a publisher token for Agent A, a reader token for Agent B, a maintainer token for the human (corrections, expiry, approval), and a reader in a second project for the isolation check. Rehearsals use fresh project IDs in the same Atlas database and index. Each process receives only its own token. Atlas and provider credentials stay with the service and the trusted runner. Tokens never reach the browser. The service sets project and author from the token and rejects caller-supplied identity fields.
 
-Every usable result has `schema_version: 1`, `hypothesis`, `fixture_revision`, flat `conditions` and `configuration` objects with scalar values, `metric` with name, value, unit, operator and threshold, `execution` (`completed|crashed|timed_out`), `validity` (`valid|invalid|inconclusive`), `direction` (`positive|negative|undetermined`), `evidence`, `source`, and UTC `expires_at`. A completed, valid measurement with a receipt supports a positive or negative direction according to the threshold. Other combinations require `undetermined` and may have a null metric value. The runner can show such records in a direct read while search and execution resolution use completed, valid results only.
+| Role | Can |
+| --- | --- |
+| reader | search, read current results and evidence, list findings, read history, resolve, propose a decision, record a run receipt for an approved decision |
+| publisher | reader rights, plus publish, and correct or expire its own records |
+| maintainer | reader rights, plus publish, correct and expire any record in the project, approve or reject decisions |
 
-Example body for `POST /v1/results`. Evidence is a small inline JSON receipt or curated source excerpt. The API serves it under the result's visibility and lifecycle.
+## Results
+
+Every result has `schema_version: 1`, `hypothesis`, `fixture_revision`, flat `conditions` and `configuration` objects with scalar values, `metric` with name, value, unit, operator and threshold, `execution` (`completed|crashed|timed_out`), `validity` (`valid|invalid|inconclusive`), `direction` (`positive|negative|undetermined`), `evidence`, `source`, and UTC `expires_at`. A completed, valid measurement with a receipt supports a positive or negative direction according to the threshold. Other combinations require `undetermined` and may have a null metric value. Such records are stored and shown to humans with a "crashed" or "inconclusive" label, but search, applicability and resolve only use completed, valid results. A crash never counts as a failed idea.
+
+Example body for `POST /v1/results`. Evidence is a small inline JSON receipt. The API serves it under the result's visibility and lifecycle.
 
 ```json
 {
@@ -23,98 +33,173 @@ Example body for `POST /v1/results`. Evidence is a small inline JSON receipt or 
   "execution": "completed",
   "validity": "valid",
   "direction": "positive",
-  "evidence": {"kind": "job_receipt", "data": {"run_id": "cal-a-1", "input_bytes": 928, "output_bytes": 242, "roundtrip_ok": true}},
-  "source": {"system": "autosci", "revision": "6bc834a805a1744959a9983809e5d6f0263ef791", "artifact": "wiki/experiments/dict-a-l1.md", "source_agent": "agent-a", "record": "dict-a-l1"},
+  "evidence": {"kind": "job_receipt", "data": {"run_id": "cal-a-1", "input_bytes": 928, "output_bytes": 242, "roundtrip_ok": true,
+    "reproduce": {"command": "python -m benchmark.run --job dict-a-l1 --cohort A --split calibration", "fixture_sha256": "<hex>", "dictionary_sha256": "<hex>", "zlib_version": "1.3.1", "python_version": "3.11.9"}}},
+  "source": {"system": "benchmark", "source_agent": "agent-a", "record": "dict-a-l1"},
   "expires_at": "2026-11-15T00:00:00Z"
 }
 ```
 
-Use a fresh future timestamp in the harness. In public output use only synthetic receipts and the attributed upstream examples below. `Ref` is `{"result_id":"<uuid>","version":1}`. `Result` is the publish body without `evidence`, plus `Ref` fields and `author_id`. Authorized project callers can read evidence through the evidence route. Output errors use `{"detail":"<stable code>"}`.
+Use a fresh future timestamp in the harness. `evidence.data.reproduce` is required for completed runs (R11). `Ref` is `{"result_id":"<uuid>","version":1}`. `Result` is the publish body without `evidence`, plus `Ref` fields, `author_id` and `status` (`current|expired`). Output errors use `{"detail":"<stable code>"}`.
+
+`Applicability` is computed by the platform against the caller's task conditions: `{"status":"applies|mismatch","mismatches":[{"field":"cohort","wanted":"A","found":"B"}]}`. The rule is exact agreement on `fixture_revision`, `conditions.cohort`, `conditions.codec` and `conditions.dictionary_revision`. A calibration result applies to a holdout task (declared transfer); split is otherwise ignored. A result with execution or validity other than completed and valid is never returned by search.
+
+## Routes
 
 | Route | Request and success response |
 | --- | --- |
+| `GET /v1/health` | → 200 `{"atlas":"ok","index":"READY","database":"<name>","project_id":"<from token>"}`. 503 with the failing part if Atlas or the index is unavailable. |
 | `POST /v1/results` | Publish body → 201 `Ref`. Version starts at 1. |
-| `POST /v1/search` | `{"question":"How can we shrink each telemetry message sent on its own?"}` → 200 `{"candidates":[{"result":Result,"score":0.82}]}`. May return an empty list. |
-| `GET /v1/results/{id}?version=1` | → 200 `Result`. An omitted version means current. |
-| `GET /v1/results/{id}/evidence?version=1` | → 200 `{"result_id":"<uuid>","version":1,"evidence":{"kind":"job_receipt","data":{}}}`. Same optional-version behavior. |
-| `POST /v1/results/{id}/correct` | `{"expected_version":1,"reason":"Receipt was linked to the wrong cohort","replacement":{...}}` with a full publish body → 200 `Ref` with version 2. |
-| `POST /v1/results/{id}/expire` | `{"expected_version":2,"reason":"Withdraw observation"}` → 200 `{"result_id":"<uuid>","version":2,"expired":true}`. A scheduled expiry uses the publish timestamp. |
-| `POST /v1/resolve` | `{"refs":[{"result_id":"<uuid>","version":1}]}` → 200 `{"results":[Result]}` in request order if every ref is current and usable. Validate immediately before dispatch. |
+| `GET /v1/results` | → 200 `{"items":[Result]}`: every head in the caller's project, including expired ones with `status:"expired"` and crashed ones. For the Research and Governance pages. Agents do not use it for decisions. |
+| `POST /v1/search` | `{"question":"What previously helped shrink one-at-a-time cohort A telemetry packets?","conditions":{"fixture_revision":"short-events-v1","cohort":"A","codec":"zlib-wrapped-deflate","dictionary_revision":"phrases-v1","split":"holdout"}}` → 200 `{"candidates":[{"result":Result,"score":0.82,"applicability":Applicability}]}`. Only current, usable results. Mismatched results are returned with their label so the agent and the UI can show why they were set aside. `conditions` is optional; without it `applicability` is null. May return an empty list. |
+| `GET /v1/results/{id}?version=1` | → 200 `Result`. An omitted version means current. 404 if expired or superseded. |
+| `GET /v1/results/{id}/evidence?version=1` | → 200 `{"result_id":"<uuid>","version":1,"evidence":{…}}`. Same version rules. |
+| `GET /v1/results/{id}/history` | → 200 `{"result_id":"<uuid>","status":"current|expired","current_version":2,"versions":[{"version":1,"state":"superseded","result":Result,"evidence":{…},"replaced_at":"…","replaced_by":"maintainer","reason":"…"},{"version":2,"state":"current",…}],"events":[{"at":"…","actor":"…","action":"publish|correct|expire","version":2,"reason":"…"}]}`. For humans (R7, R8). Any project role. Old versions here are for inspection only: search, read, evidence and resolve never accept them. |
+| `POST /v1/results/{id}/correct` | `{"expected_version":1,"reason":"Receipt was linked to the wrong cohort","replacement":{…full publish body…}}` → 200 `Ref` with version 2. |
+| `POST /v1/results/{id}/expire` | `{"expected_version":1,"reason":"Superseded by newer measurements"}` → 200 `{"result_id":"<uuid>","version":1,"expired":true}`. A scheduled expiry uses the publish timestamp. |
+| `POST /v1/resolve` | `{"refs":[Ref]}` → 200 `{"results":[Result]}` in request order if every ref is current and usable. Validate immediately before dispatch. |
+| `POST /v1/decisions` | Agent B's proposal: `{"request":"…","memory":"on|off","conditions":{…},"candidates":[{"ref":Ref,"score":0.86,"applicability":Applicability}],"job_id":"dict-a-l6","used_refs":[Ref],"skipped_jobs":[{"job_id":"dict-b-l6","reason":"…","refs":[Ref]}],"rejected_candidates":[{"ref":Ref,"reason":"…"}],"reason":"…","model":"gpt-4.1-mini-2025-04-14"}` → 201 `Decision` with `status:"pending"`. 422 if the job is not in the catalog, or a used ref is not current or does not apply. |
+| `GET /v1/decisions/{id}` | → 200 `Decision`. |
+| `POST /v1/decisions/{id}/approve` | `{"note":"Looks right"}` → 200 `Decision` with `status:"approved"`, `decided_by`, `decided_at`. Maintainer only. 409 unless pending. |
+| `POST /v1/decisions/{id}/reject` | `{"reason":"Try the baseline first"}` → 200 `Decision` with `status:"rejected"`. Maintainer only. 409 unless pending. Nothing runs. |
+| `POST /v1/decisions/{id}/receipt` | The runner's measured receipt → 201 `Decision` with `status:"executed"` and the receipt attached. 409 unless approved and not yet executed. If the runner's resolve failed, it posts `{"aborted":true,"reason":"…"}` and the decision becomes `aborted`. |
 
-Use 401 for missing or unknown token, 403 for role denial on visible records, 404 for absent, out-of-scope, expired or historical reads and unusable resolve refs, 409 for a stale write on a visible current record, 422 for invalid bodies, and 503 for unavailable search. A resolve failure aborts dispatch and allows one fresh search and decision within the same job budget. Fail closed on authorization, dependency or validation errors. Token roles and source fields are kept distinct.
+`Decision` is the proposal plus `decision_id`, `project_id`, `proposed_by`, `status` (`pending|approved|rejected|executed|aborted`), `decided_by`, `decided_at`, `note` or `reason`, and `receipt`.
+
+Use 401 for missing or unknown token, 403 for role denial on visible records, 404 for absent, out-of-scope, expired or historical reads on agent paths and unusable resolve refs, 409 for a stale write or a decision in the wrong state, 422 for invalid bodies, and 503 for unavailable search. A resolve failure aborts dispatch and allows one fresh search and decision within the same job budget. Fail closed on authorization, dependency or validation errors. Token roles and source fields are kept distinct.
 
 ## Atlas storage and lifecycle
 
-- `MEMORY_ATLAS_URI` and `MEMORY_ATLAS_DB` point to the event Sandbox. `results` holds the authoritative current document keyed by UUID. It has `project_id`, `author_id`, `version`, `search_key`, normalized fields, inline evidence, `expires_at`, `purge_at` and audit entries containing previous version, timestamp, reason and actor. Each correction atomically replaces the current payload and appends the supersession entry using a conditional update on project, current version and active expiry. Manual expiry atomically sets `expires_at` to service time and records why. The original publisher retains ownership.
-- `result_vectors` holds immutable search entries keyed by a generated `search_key` with `project_id`, `result_id`, `version`, `embedding`, `embedding_model`, and `purge_at`. Stage the vector before committing the head for usable records. A candidate is accepted only if its key and version match the authoritative head. An orphan or old key is inert and eligible for cleanup. The `research_memory_v1` index has a 1536-dimensional cosine vector field `embedding` and a filter field `project_id`. Embed hypothesis, summarized measurement, fixture and conditions using `text-embedding-3-small` at 1536 dimensions. Embed the search question with the same model. Service secrets use `OPENAI_API_KEY`. [Embedding model](https://developers.openai.com/api/docs/models/text-embedding-3-small)
-- Put `$vectorSearch` first with `exact: true`, `limit: 12`, and a `project_id` filter derived from the token. If the Sandbox rejects exact search, use ANN with `numCandidates: 240` and the same filter and limit. Project only candidate keys, versions, IDs and scores. Hydrate from the primary using the authorized project and service UTC clock. Drop stale, mismatched, invalid and expired hits before returning up to eight results. Recheck lifecycle at direct read, evidence read and execution resolution. Both projects get their own sentinel in the selectivity test. [Atlas Vector Search](https://www.mongodb.com/docs/vector-search/query/aggregation-stages/vector-search-stage/)
-- Correction discards the old payload and its inline evidence from the head. Its audit metadata stays with the result. Expiry immediately hides the entire current record and evidence. TTL on each collection's BSON Date `purge_at` with `expireAfterSeconds: 0` is asynchronous cleanup. Current results and their vectors get `expires_at + 24h` at creation. After correction or manual expiry, best-effort deletion of the retired vector can shorten retention. Shorten the result purge date to the new expiry plus 24h on manual expiry. The API stays correct if deletion or TTL lags. [Atlas TTL](https://www.mongodb.com/docs/manual/core/index-ttl/)
+- `MEMORY_ATLAS_URI` and `MEMORY_ATLAS_DB` point to the event Sandbox. `results` holds the authoritative current head keyed by UUID with `project_id`, `author_id`, `version`, `search_key`, normalized fields, inline evidence, `expires_at`, `purge_at` and an `events` array (actor, time, action, version, reason). Each correction copies the current head into `result_versions` and replaces the head, in one transaction conditional on project, current version and active expiry. Manual expiry atomically sets `expires_at` to service time and appends an event. The original publisher keeps ownership.
+- `result_versions` holds superseded payloads and their evidence keyed by `(result_id, version)`, with `project_id` and `purge_at`. Only the history route reads it.
+- `result_vectors` holds immutable search entries keyed by a generated `search_key` with `project_id`, `result_id`, `version`, `embedding`, `embedding_model`, and `purge_at`. Stage the vector before committing the head. A candidate is accepted only if its key and version match the authoritative head. An orphan or old key is inert and eligible for cleanup. The `research_memory_v1` index has a 1536-dimensional cosine vector field `embedding` and a filter field `project_id`. Embed hypothesis, summarized measurement, fixture and conditions using `text-embedding-3-small` at 1536 dimensions, and embed the search question with the same model. Service secrets use `OPENAI_API_KEY`. [Embedding model](https://developers.openai.com/api/docs/models/text-embedding-3-small)
+- **Search is one Atlas aggregation.** MongoDB, not Python, does retrieval, isolation, the stale-version check, expiry and applicability in a single `aggregate` on `result_vectors`. Python only embeds the question and passes the task conditions in. Recheck lifecycle at direct read, evidence read, resolve, decision create and receipt with equivalent `find` filters on `$$NOW`. Both projects get their own sentinel in the selectivity test. [Atlas Vector Search](https://www.mongodb.com/docs/vector-search/query/aggregation-stages/vector-search-stage/) · [$lookup](https://www.mongodb.com/docs/manual/reference/operator/aggregation/lookup/)
 
-## First benchmark and agent decision
-
-Use `short-events-v1`, a synthetic independent-event compression fixture. A pre-shared dictionary models a receiver that already has the deployment's event vocabulary. Count all zlib stream bytes, including headers and the dictionary ID. Dictionary distribution is a fixed setup cost outside the per-message metric and should be disclosed in the demo.
-
-Generate 32 ASCII tokens per cohort A and B using the first 24 hex characters of SHA-256 of `"{cohort}:{i}"` for indices 0–31. Join each cohort's 32 tokens with `|` for its pre-shared `phrases-v1` dictionary. Make eight rows per split, each the first 16 hex characters of SHA-256 of `"{cohort}:{split}:{j}"` followed by four tokens, all joined by `|`. Use token indices `(4*j + offset + k) % 32`, where `j=0..7`, `k=0..3`, and offset is 0 for `calibration` and 1 for `holdout`. Each split has 928 input bytes. Compress each row in its own `zlib.compressobj(level, zlib.DEFLATED, 15, **kwargs)` stream, with `zdict` only for dictionary jobs. Decompress with identical dictionary and window settings and verify exact equality and end-of-stream for all rows. Score `wire_ratio = sum(output_bytes) / sum(input_bytes)` with `<= 0.40` as success. Record fixture and dictionary hashes and the zlib version in the receipt.
-
-| Producer run | Input | Configuration | Planning probe |
-| --- | --- | --- | --- |
-| Promising observation | A calibration | `dict-a-l1`, level 1, dictionary A | 242/928, positive |
-| Prior unsuccessful path | A calibration | `dict-b-l1`, level 1, dictionary B | 760/928, completed valid negative with all rows decoded |
-| Distractor | B calibration | `dict-b-l1`, level 1, dictionary B | 234/928, positive under cohort B |
-
-Agent A runs these three fixed calibration jobs, exports their measured receipts, publishes by way of the two adapters, then exits. Use the ARA adapter for the valid negative and AutoSci for the promising observation and distractor. P2 also checks the real pinned upstream examples with a separate smoke project. The synthetic benchmark artifacts use fresh measurements in upstream-compatible shapes.
-
-Each fresh Agent B process uses the same request, one job budget, prompt, and ordered catalog. Request: “Can we get individually transmitted cohort A telemetry well under half its original size on unseen events? Aim for 40% or less and spend one trial.” Search question: “What previously helped shrink one-at-a-time cohort A telemetry packets?” Published producer text uses independent DEFLATE event payloads and shared phrase dictionaries. Smoke-check the paraphrase in a set with five unrelated valid observations and the cohort B distractor. The required observations and distractor must be available among the authorized candidates, and at least one applicable observation must rank above all unrelated observations. Show a matched condition and a rejected cohort in the decision receipt.
-
-| Mode | Expected actual job on A holdout | Planning probe |
-| --- | --- | --- |
-| Memory off | `plain-l1`, level 1, no dictionary | 686/928 |
-| Memory on | `dict-a-l6`, level 6, dictionary A | 238/928 |
-| After correction | `plain-l1` after correcting the promising record's cohort to B and replacing its evidence with the measured B calibration result for dictionary A | 686/928 |
-| After scheduled expiry | `plain-l1` after the promising result's `expires_at` passes in an independent seeded scenario | 686/928 |
-
-The third candidate, `dict-b-l6`, measured 760/928 on A holdout in the probe. Measure it during fixture validation so the receipt comparison can account for every candidate. Each accepted result should be on the expected side of the threshold. Byte counts can vary by zlib version, which the runner records.
-
-The catalog order is `plain-l1`, `dict-a-l6`, `dict-b-l6`. A no-evidence baseline uses the dictionary-free validation trial because it assumes no usable receiver vocabulary. With evidence B chooses whether to extend a supported approach and records which approaches it skips and why. Fetch each candidate's versioned evidence before the decision and attach the measurement to the model context. Drop a candidate if its evidence has since become unavailable. Configure one stateless `gpt-4.1-mini-2025-04-14` Responses request per decision with a JSON schema for `job_id`, `used_refs`, `skipped_jobs` with reasons and refs, `rejected_candidates` with refs and applicability reasons, and `reason`. Instructions favor a bounded follow-up with applicable support, then the dictionary-free baseline. The applicability rule is exact agreement on fixture revision, cohort, codec and dictionary revision, with declared calibration-to-holdout transfer. Level 1 supports testing the same dictionary family at level 6. A valid negative discourages a repeat of that dictionary family in the same conditions and is advisory across compression levels. B evaluates applicability and chooses the job. Code validates the allowlist, budget and applicability of references used to justify the selection and skips. Resolve those exact references before executing. Keep rejected refs in the trace as candidates B considered. The runner applies only the registered config and does one round-trip-checked measurement. [Planner model](https://developers.openai.com/api/docs/models/gpt-4.1-mini)
-
-P3 owns `python -m benchmark.run --job dict-a-l6 --cohort A --split holdout` and `python -m benchmark.agent --memory on --base-url http://127.0.0.1:8000 --out receipts/on.json`. `--memory off` bypasses retrieval and uses an empty candidate list. B reads its token from `MEMORY_TOKEN`. The output includes request, model, catalog and budget, selected and skipped jobs, candidate/result refs and applicability reasons, exact used refs, executed configuration, runtime, status, metric, input and output byte counts, hashes and round-trip evidence. The planning arithmetic above came from a local Python 3.11 standard-library probe. Build acceptance requires receipts from the new runner. For the correction, separately measure `dict-a-l1` on B calibration (probe 760/928), yielding a valid negative under B. Credit that receipt as the replacement and retain the version link.
-
-## Research tree
-
-Use a read-only browser view at `/research` for researchers reviewing agent work. The first screen opens the benchmark question and its branches. A search box uses the existing scoped semantic search to find other researchers’ results in the current project. Selecting a hit opens its branch when present or its evidence inspector when the result has no local lineage. Researchers can browse by question and compare measurements across agents in the same project.
-
-| View | Interaction |
-| --- | --- |
-| Research tree | Expand a question into measured observations and agent decisions. Show the two cohort A results and the cohort B distractor. Under the decision, show the follow-up run and explain which candidate was skipped and which observation was ruled out by its conditions. |
-| Evidence inspector | Select a node to see the author and source artifact, execution status, scientific validity, outcome, conditions, configuration, metric and threshold, and the measured receipt. Select the agent decision to see its exact cited result versions, rationale, and the job that actually ran. |
-| Compare runs | Switch among off, on, and corrected rehearsal receipts for the same question. Show executed job and byte ratio together. Label unavailable evidence on historical receipts and keep exact-version references. |
-
-The layout uses an expandable semantic tree and a details pane. On narrow screens show details below the selected branch. Support keyboard navigation, visible focus, clear loading, empty and unavailable states, and text labels for outcome and validity. A completed valid negative and an execution failure use distinct labels. Show conditions before interpreting an outcome.
-
-```mermaid
-flowchart LR
-    Q[Can we shrink independent cohort A messages?]
-    Q --> A[Matched dictionary met threshold]
-    Q --> B[Wrong dictionary missed threshold]
-    Q --> C[Cohort B result]
-    Q --> D[Agent B decision]
-    A -->|Supports follow-up| D
-    B -->|Informs skipped job| D
-    C -->|Cohort mismatch| D
-    D --> E[Level 6 follow-up receipt]
+```js
+db.result_vectors.aggregate([
+  { $vectorSearch: { index: "research_memory_v1", path: "embedding", queryVector: q,
+      filter: { project_id: P },              // isolation, from the token
+      exact: true, limit: 12 } },             // ANN fallback: numCandidates 240
+  { $addFields: { score: { $meta: "vectorSearchScore" } } },
+  { $lookup: { from: "results", let: { id: "$result_id", v: "$version" }, as: "head",
+      pipeline: [ { $match: { $expr: { $and: [
+        { $eq: ["$_id", "$$id"] }, { $eq: ["$project_id", P] },
+        { $eq: ["$version", "$$v"] },          // stale index entry → no match
+        { $gt: ["$expires_at", "$$NOW"] },     // expired → no match, before TTL runs
+        { $eq: ["$execution", "completed"] }, { $eq: ["$validity", "valid"] } ] } } },
+        { $project: { evidence: 0 } } ] } },
+  { $unwind: "$head" },                        // drops stale, expired and crashed hits
+  { $addFields: { mismatches: { $filter: { as: "m", cond: { $ne: ["$$m.found", "$$m.wanted"] }, input: [
+      { field: "fixture_revision", wanted: C.fixture_revision, found: "$head.fixture_revision" },
+      { field: "cohort", wanted: C.cohort, found: "$head.conditions.cohort" },
+      { field: "codec", wanted: C.codec, found: "$head.conditions.codec" },
+      { field: "dictionary_revision", wanted: C.dictionary_revision, found: "$head.conditions.dictionary_revision" } ] } } } },
+  { $addFields: { applicability: { status: { $cond: [{ $eq: [{ $size: "$mismatches" }, 0] }, "applies", "mismatch"] }, mismatches: "$mismatches" } } },
+  { $limit: 8 }
+])
 ```
 
-P4 owns the browser page and the tree manifest emitted by the harness. Serve a simple static HTML, CSS and JavaScript bundle from the API origin so the UI can use its existing routes. The manifest holds `question`, decision and run IDs, and observation references as `{result_id, version}`. Each decision receipt already carries `used_refs`, `skipped_jobs`, `rejected_candidates`, and the executed run. Use those links to render lineage. Group branches from the manifest and hydrate observation details and evidence through the platform API. The first view can start against stubbed HTTP responses and the harness receipt shape. P1 provides a same-origin mount point and a restricted project reader token for the local demo. Keep the token in memory for the session. Ship a labeled synthetic manifest for preview and load demo receipts from the local harness. Keep private receipts, result text, and tokens out of static files.
+- **Change streams drive the live UI.** The presenter opens one change stream on `results` and one on `decisions`, each with a `$match` on `fullDocument.project_id` (use `fullDocument: "updateLookup"`). Every publish, correction, expiry, approval and receipt reaches the UI within a second without polling. The UI never reloads to show new findings. [Change streams](https://www.mongodb.com/docs/manual/changeStreams/)
+- **Atlas activity is captured, not described.** The platform registers a PyMongo `CommandListener` that records each command's name, collection, duration in ms, documents returned, and a redacted command shape (query vector shown as `[1536 floats]`, no URIs or tokens). The presenter serves it on `/demo/events`. [Command monitoring](https://pymongo.readthedocs.io/en/stable/api/pymongo/monitoring.html)
+- Preflight confirms the event Sandbox supports `$vectorSearch` with a filter field, `$lookup` after `$vectorSearch`, multi-document transactions, change streams and TTL indexes. If change streams are unavailable on the Sandbox tier, the presenter polls `results` and `decisions` by `updated_at` every 500 ms and the UI labels the panel “polling”.
+- `decisions` holds one document per decision. Approve, reject and receipt are conditional updates on `status`, so a decision can't be approved twice or executed without approval.
+- Expiry hides the record from every agent path immediately. TTL on each collection's BSON Date `purge_at` with `expireAfterSeconds: 0` is asynchronous cleanup: heads and vectors get `expires_at + 24h`, history entries get the head's purge date. Best-effort deletion of a retired vector after correction or expiry can shorten retention. The API stays correct if deletion or TTL lags. [Atlas TTL](https://www.mongodb.com/docs/manual/core/index-ttl/)
 
-Render referenced observations only after a versioned authorized read. Cross-project, expired, and superseded observations get a generic “Evidence unavailable” state wherever a receipt already references a ref. Clear previously loaded details on a failed recheck or identity change. Inspecting a receipt rechecks its references, and opening evidence uses the exact cited version. Historical execution receipts retain the executed job and metric. Keep full local demo receipts in the authorized rehearsal context, and use only synthetic redacted material for public replay.
+## Benchmark and agent decision
 
-For research at scale, render the visible question as a tree backed by a graph. Keep a shared observation once and render cross-links from every decision that cites it. Future expansion uses paginated neighbors, semantic entry points, and filters for project, cohort, source and validity. A result from another researcher is discoverable through authorized project membership. The first demo needs one question, branching and an evidence inspector with existing search. The governed execution path and comparison receipts remain the submission centerpiece.
+Use `short-events-v1`, a synthetic independent-event compression fixture. Each message is compressed on its own, as if sent one at a time. A pre-shared dictionary models a receiver that already knows the deployment's event vocabulary. Count all zlib stream bytes, including headers and the dictionary ID. Dictionary distribution is a fixed setup cost outside the per-message metric and should be disclosed in the demo. No model is trained anywhere.
 
-## ARA and AutoSci adapters
+Generate 32 ASCII tokens per cohort A and B using the first 24 hex characters of SHA-256 of `"{cohort}:{i}"` for indices 0–31. Join each cohort's 32 tokens with `|` for its pre-shared `phrases-v1` dictionary. Make eight rows per split, each the first 16 hex characters of SHA-256 of `"{cohort}:{split}:{j}"` followed by four tokens, all joined by `|`. Use token indices `(4*j + offset + k) % 32`, where `j=0..7`, `k=0..3`, and offset is 0 for `calibration` and 1 for `holdout`. Each split has 928 input bytes. Compress each row in its own `zlib.compressobj(level, zlib.DEFLATED, 15, **kwargs)` stream, with `zdict` only for dictionary jobs. Decompress with identical dictionary and window settings and verify exact equality and end-of-stream for all rows. Score `wire_ratio = sum(output_bytes) / sum(input_bytes)` with `<= 0.40` as success. Record the rerun command, fixture and dictionary hashes, and zlib and Python versions in the receipt.
 
-Both adapters transform a single artifact record plus a JSON sidecar for explicit metric, settings and evidence into the publish body. Use `python -m adapters.ara --input PATH --node ID --context PATH [--publish]` and `python -m adapters.autosci --input PATH --context PATH [--publish]`. Default prints normalized JSON. `--publish` posts to the shared API using `MEMORY_BASE_URL` and `MEMORY_TOKEN` and prints the returned ref. Sidecar keys are `fixture_revision`, `conditions`, `configuration`, `metric`, `evidence`, `expires_at`, and `source` with `revision`, `artifact`, `source_agent` and `record`. The adapter sets `source.system` and validates record-to-sidecar and evidence agreement. Missing or contradictory data fails normalization. Source paths are attribution and evidence data is explicitly supplied. Agent A generates the benchmark artifacts and sidecars from runner receipts. Use PyYAML safe loading, a narrow shape validator and scoped fixture paths. Budget 45 minutes per adapter and 25 minutes to integrate both.
+| Agent A run | Input | Configuration | Planning probe |
+| --- | --- | --- | --- |
+| Promising finding | A calibration | `dict-a-l1`, level 1, dictionary A | 242/928, positive |
+| Failed approach | A calibration | `dict-b-l1`, level 1, dictionary B | 760/928, completed valid negative with all rows decoded |
+| Other cohort | B calibration | `dict-b-l1`, level 1, dictionary B | 234/928, positive under cohort B |
+| Crashed run | A calibration | `dict-c-l1`, dictionary C, which is not provisioned | Runner fails before measuring: `crashed / invalid / undetermined`, null metric |
 
-- **ARA.** Read the pinned companion's `artifacts/rebench/rebench-triton_cumsum/trace/exploration_tree.yaml` by recursive node ID. Node N122 is a completed, numerically correct advanced-indexing/scatter-gather experiment whose score 1.3605 missed the 0.47 target. Its evidence is `evidence/tables/malt_attempts.md`, MALT run 343935 attempt 20. Preserve method, approach context, node, source agent, table row, GPU workload conditions and score. Where N122 omits a dedicated hypothesis, the sidecar supplies the explicit goal derived from its context and evidence. Check N120 against attempt 16 in the same table as `crashed/invalid/undetermined`, preserving the exec-loaded Triton JIT error and null score. Never infer direction from `type: dead_end`. Benchmark export uses the same node fields plus explicit hypothesis and evidence. This needs one YAML reader and a curated sidecar, with the upstream CLI and runtime off the build path. [ARA layout](https://github.com/ARA-Labs/Agent-Native-Research-Artifact/tree/e52a925e9d03b4ada3008653e72f99b04116fca2) · [Pinned trace and evidence](https://github.com/AmberLJC/ara-paperbench/tree/3fe7ab4d08f68555d8c4661fa2b4fbfd4d597fd8/artifacts/rebench/rebench-triton_cumsum)
-- **AutoSci.** Read the SciMem experiment page `wiki/experiments/{slug}.md` after `/exp-run {slug} --collect` fills in results and `/exp-eval` writes `## Idea updates`. Parse YAML frontmatter (`slug`, `status`, `outcome`, `hypothesis`, `linked_idea`, `setup`, `metrics`, `key_result`) and preserve `Setup`, `Results`, and the `Verdict` line as evidence context. In the pinned schema, `metrics` is a list of names. The fixture puts `wire_ratio` in that list, measured bytes in `Results`, and a receipt in the sidecar with numerical metric and threshold. Use the receipt for validity and direction. Completed succeeded/failed records need matching measurements and conclusive evidence. Inconclusive results are undetermined. Reject unfinished pages at this handoff. The `exp-eval` verdict concerns the linked idea and stays source metadata in the evidence. The benchmark fixture is event-authored and matches the pinned schema and template. Native execution would add Claude Code, the wiki runtime and review tooling. The adapter starts at the persisted handoff and needs the same YAML library as ARA. [SciMem](https://arxiv.org/html/2605.31468v1#S3) · [Collection](https://github.com/PKU-DAIR/AutoSci/blob/6bc834a805a1744959a9983809e5d6f0263ef791/i18n/en/skills/exp-run/SKILL.md) · [Evaluation](https://github.com/PKU-DAIR/AutoSci/blob/6bc834a805a1744959a9983809e5d6f0263ef791/i18n/en/skills/exp-eval/SKILL.md) · [Schema](https://github.com/PKU-DAIR/AutoSci/blob/6bc834a805a1744959a9983809e5d6f0263ef791/runtime/schema/entities.yaml) · [Template](https://github.com/PKU-DAIR/AutoSci/blob/6bc834a805a1744959a9983809e5d6f0263ef791/runtime/templates/experiments.md.tmpl)
+Agent A runs these four jobs, turns each runner receipt into a publish body with `python -m benchmark.publish`, publishes with its own token, then exits. The crashed run shows humans that a crash is labelled differently from a failed idea; search never returns it.
 
-P2 records provenance in the event repo. Credit ARA at `e52a925e9d03b4ada3008653e72f99b04116fca2` (MIT, Orchestra Research), the companion at `3fe7ab4d08f68555d8c4661fa2b4fbfd4d597fd8` (CC BY 4.0, Amber Liu and ARA project contributors), and AutoSci at `6bc834a805a1744959a9983809e5d6f0263ef791` (MIT, OmegaWiki Contributors). Link source and license, mark adapted excerpts, and include full MIT notices if distributing copies or substantial portions. Credit upstream schemas and examples and identify platform, adapters, benchmark and harness as event-built. Fetch pinned references for the upstream check and ship the synthetic fixtures with the demo. [ARA license](https://github.com/ARA-Labs/Agent-Native-Research-Artifact/blob/e52a925e9d03b4ada3008653e72f99b04116fca2/LICENSE) · [Companion license](https://github.com/AmberLJC/ara-paperbench/blob/3fe7ab4d08f68555d8c4661fa2b4fbfd4d597fd8/LICENSE) · [AutoSci license](https://github.com/PKU-DAIR/AutoSci/blob/6bc834a805a1744959a9983809e5d6f0263ef791/LICENSE)
+Agent B uses the same request, conditions, one-job budget, prompt and ordered catalog every time. Request: “Can we get individually transmitted cohort A telemetry well under half its original size on unseen events? Aim for 40% or less and spend one trial.” Search question: “What previously helped shrink one-at-a-time cohort A telemetry packets?” A's published text uses “independent DEFLATE event payloads” and “shared phrase dictionaries”, so finding it needs search by meaning. Smoke-check the paraphrase in a set with five unrelated valid findings and the cohort B finding. The required findings must be among the candidates, and at least one applicable finding must rank above all unrelated ones.
+
+Demo and rehearsal states run in this order in one project, with the same request each time:
+
+| State | What changed | Expected recommendation on A holdout | Planning probe |
+| --- | --- | --- | --- |
+| Memory off | B skips search | `plain-l1`, no dictionary | 686/928 |
+| Memory on | — | `dict-a-l6`. Cites the promising finding v1 and the failed approach v1. Skips `dict-b-l6` because dictionary B failed on cohort A. Rejects the cohort B finding as a mismatch. | 238/928 |
+| After correction | Maintainer corrects the promising finding: the receipt belonged to cohort B. v2 is the measured `dict-a-l1` on B calibration (probe 760/928, valid negative). | `plain-l1`. v2 now shows as a cohort mismatch. Dictionary B still skipped because of the failed approach. | 686/928 |
+| After correction and expiry | Maintainer expires the failed approach (“Superseded by newer measurements”). | `plain-l1`. The failed approach is no longer among the candidates and shows as Expired in the UI. `dict-b-l6` is now skipped for lack of applicable evidence instead of a known failure. | 686/928 |
+
+The job changes once (on → after correction). The expiry changes the evidence and the skip reasons visibly, but not the job, because nothing applicable supports a dictionary by then. Say so in the demo. Scheduled expiry (an `expires_at` that passes on its own) is tested separately in the lifecycle gate, not in the live demo.
+
+The third candidate, `dict-b-l6`, measured 760/928 on A holdout in the probe. Measure it during fixture validation so every candidate is accounted for. Each finding should land on the expected side of the threshold. Byte counts can vary by zlib version, which the runner records.
+
+The catalog order is `plain-l1`, `dict-a-l6`, `dict-b-l6`. The no-evidence baseline is the dictionary-free job because it assumes no shared receiver vocabulary. B fetches each candidate's versioned evidence before deciding and attaches the measurement and the platform's applicability label to the model context. Use one stateless `gpt-4.1-mini-2025-04-14` Responses request per decision with a JSON schema for `job_id`, `used_refs`, `skipped_jobs` with reasons and refs, `rejected_candidates` with refs and reasons, and `reason`. Instructions favor a bounded follow-up with applicable support, then the baseline. Level 1 supports testing the same dictionary family at level 6. A valid negative discourages repeating that dictionary family under the same conditions and is advisory across compression levels. Only results labelled `applies` may appear in `used_refs` or as reasons for skips; the platform rejects the decision otherwise. Keep mismatched refs in `rejected_candidates`. [Planner model](https://developers.openai.com/api/docs/models/gpt-4.1-mini)
+
+P3 owns:
+- `python -m benchmark.run --job dict-a-l6 --cohort A --split holdout`: one measured run, receipt to stdout.
+- `python -m benchmark.publish --out receipts/producer.json`: Agent A's four runs and publishes. Accepts `--project-token-env`.
+- `python -m benchmark.agent --memory on --base-url http://127.0.0.1:8000 --out receipts/on.json`: Agent B searches, decides and posts the proposal. Prints the `decision_id`. Never executes. `--memory off` skips search.
+- `python -m benchmark.execute --decision ID`: runs only if the decision is approved, resolves the cited refs first, runs the registered configuration once, and posts the receipt.
+
+B reads its token from `MEMORY_TOKEN`. Receipts include request, model, catalog and budget, candidates with applicability, selected and skipped jobs, exact used refs, approval, executed configuration, runtime, status, metric, byte counts, hashes and round-trip evidence. The planning arithmetic above came from a local Python 3.11 standard-library probe. Build acceptance requires receipts from the new runner.
+
+## Presenter service
+
+P2 owns `uvicorn demo.presenter:app --host 127.0.0.1 --port 8100`. It serves the UI at `/`, holds the four tokens server-side, and calls the platform API and P3's commands. The browser only talks to the presenter. It binds to localhost.
+
+| Route | Does |
+| --- | --- |
+| `GET /demo/state` | Current stage, health from `GET /v1/health`, project, memory setting, findings from `GET /v1/results`, latest decision and receipts. |
+| `GET /demo/events` | Server-sent events: `change` events from the change streams (operation, collection, result or decision ID, version, status) and `atlas` events from the command listener (command, collection, ms, docs, redacted shape). The UI subscribes once on load. |
+| `POST /demo/agent-a` | Runs `benchmark.publish` with A's token. |
+| `POST /demo/agent-b` | `{"memory":"on|off"}`. Runs `benchmark.agent` with B's token. Returns the pending decision. |
+| `POST /demo/rerun` | Repeats B's last request with the same memory setting. |
+| `POST /demo/decisions/{id}/approve` and `/reject` | Forwards with the maintainer token. |
+| `POST /demo/decisions/{id}/execute` | Runs `benchmark.execute`. |
+| `POST /demo/governance/correct` | `{"result_id":…,"expected_version":…,"reason":…}`. Uses the prepared cohort B replacement from P3's receipt. |
+| `POST /demo/governance/expire` | `{"result_id":…,"expected_version":…,"reason":…}`. |
+| `GET /demo/results/{id}/history` | Forwards the history route. |
+| `POST /demo/isolation-check` | Runs the same search and a direct read with the second project's token and returns both responses (expect no candidates and 404). |
+
+`python -m demo.reset --project demo-live` clears the demo project before a presentation.
+
+## User interface
+
+P4 owns `demo/web/`, a static HTML, CSS and JavaScript bundle served by the presenter. Requirements are in [REQUIREMENTS.md](REQUIREMENTS.md#interface). Visual direction: dark green sidebar, light workspace, restrained green accents, our own product name and mark. Show Atlas status from `/v1/health` without exposing internals.
+
+| Page | Contents |
+| --- | --- |
+| Demo (default) | Seven stages from the demo sequence, with a Next button the presenter controls. Each stage shows agent activity and the evidence cards for that step. Stage 3 groups candidates as applicable success, applicable failure, and doesn't match, with the mismatched field named. Stage 4 has Approve and Reject. Stage 5 shows the measured result against the baseline and the 0.40 target. Stage 6 has Correct and Expire buttons and a Re-run after each. Stage 7 shows the four receipts side by side. |
+| Research | Searchable list from `GET /v1/results` with status (current, expired, superseded count), outcome label, execution label, cohort and conditions, and source agent. A detail view shows evidence, the rerun command, provenance and version history. |
+| Governance | Findings to review, Correct and Expire forms with a required reason, the previous and current versions side by side, and the change history. |
+| Settings | Atlas health, project, memory on/off for Agent B, environment info (model, embedding model, zlib version), and the isolation check button with its result. |
+
+**MongoDB on screen.** Two elements make the database's work visible during the whole demo. Both use only live data from `/demo/events`; nothing is hardcoded.
+
+- **Atlas activity strip** along the bottom of every page: the latest commands as they run, for example `aggregate result_vectors · $vectorSearch + $lookup · 4 docs · 38 ms`, `update results · transaction · v1 → v2`, `change stream · results · update`. Clicking a line opens the redacted pipeline in the inspector.
+- **“In MongoDB” callout** at each Demo stage, one sentence built from that stage's real events:
+
+| Stage | What the callout shows |
+| --- | --- |
+| 1 Agent A discovers | Four `insert` commands and their change-stream events arriving; findings appear in the list live. |
+| 2 MongoDB remembers | The `$vectorSearch` aggregate with the `project_id` filter, the paraphrased question, hits and latency. |
+| 3 Agent B recommends | The same pipeline's `$lookup` and applicability stages: which hits matched the live record, and the cohort mismatch computed in the database. |
+| 4 Human approves | The conditional `findOneAndUpdate` from `pending` to `approved`, and the 409 on a second click. |
+| 5 Agent B executes | `resolve` re-reading the cited versions, then the receipt `update` and its change event. |
+| 6 Governance | The correction transaction (head replaced, old version copied to `result_versions`), the expiry `update` of `expires_at`, and the stale index entry still present but dropped by the `$lookup`. TTL `purge_at` shown as future cleanup that nothing waits on. |
+| 7 Updated decision | Side-by-side receipts with the exact versions each run read from Atlas. |
+
+Settings shows the isolation check as two real commands: the same `$vectorSearch` with the other project's filter returning nothing, and the direct `find` returning no document.
+
+A right-hand evidence inspector follows the current stage or selection: conditions first, then outcome labels (execution, validity, direction), metric and threshold, evidence receipt with the rerun command, applicability, provenance and version. For a decision it shows the cited versions, skipped jobs, ruled-out findings, approval and the receipt. Use distinct text labels for a valid negative, a crash and a mismatch. Show conditions before the outcome. Support keyboard use, visible focus, and loading, empty and error states. On narrow screens the inspector stacks below.
+
+## Credits
+
+| Upstream | What inspired us | Use |
+| --- | --- | --- |
+| [ARA](https://github.com/ARA-Labs/Agent-Native-Research-Artifact/tree/e52a925e9d03b4ada3008653e72f99b04116fca2) at `e52a925e9d03b4ada3008653e72f99b04116fca2`, MIT, Orchestra Research | Dead ends kept as first-class records with a reason; results bound to code, config and evidence. The ResNet example artifact is our pitch example. | Ideas and pitch only. No code, data or runtime in the app. |
+| [AutoSci](https://github.com/PKU-DAIR/AutoSci/tree/6bc834a805a1744959a9983809e5d6f0263ef791) at `6bc834a805a1744959a9983809e5d6f0263ef791`, MIT, OmegaWiki Contributors | A list of failed ideas with reasons that agents don't revisit (`/ideate`). We scope it by conditions. | Idea only. |
+
+P2 adds `NOTICE.md` with these credits and links. Platform, presenter, benchmark, harness and UI are event-built.
