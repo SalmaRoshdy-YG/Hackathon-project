@@ -1,0 +1,4 @@
+openai>=1.75,<3
+pymongo[srv]>=4.10,<5
+scikit-learn
+torch
