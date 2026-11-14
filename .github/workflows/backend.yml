@@ -13,3 +13,5 @@ jobs:
           cache: pip
       - run: python -m pip install -r requirements.txt
       - run: python -m unittest discover -s tests
+      - run: python -m pip install -r requirements-workbench.txt
+      - run: python -m unittest tests.check_workbench_access
