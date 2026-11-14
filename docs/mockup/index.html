@@ -1,0 +1,849 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Design reference for /research. All data here is illustrative; see REQUIREMENTS.md and PLATFORM.md for the real contract. -->
+<style>[hidden]{display:none!important}body{margin:0}</style>
+<title>Precedent Research Memory</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: lab console. Top bar switches between the Research hub (showcase) and Platform verification (background harness). Main column + docked evidence inspector. */
+:root{
+  --bg:#F1F3EE; --surface:#FFFFFF; --sunk:#E7EAE3; --line:#D3D8CF; --ink:#16201B; --muted:#5C6963;
+  --accent:#0E7656; --accent-soft:#DAEEE4;
+  --a:#A2560B; --a-soft:#F5E6D2; --b:#4346B4; --b-soft:#E2E3F6; --plat:#0E7656; --plat-soft:#DAEEE4; --run:#6B4FA0; --run-soft:#ECE5F6;
+  --pos:#1B7A3D; --pos-soft:#DCEFE1; --neg:#B0461A; --neg-soft:#F7E0D4; --bad:#B02233; --bad-soft:#F6DADD; --off:#6E7973; --off-soft:#E6E8E4;
+  --verify:#5B5F2E; --verify-soft:#ECEDD8;
+  --code-bg:#18211D; --code-fg:#D5E1DA; --code-key:#8FD6B4; --code-str:#E9C08A; --code-num:#A9B6F2;
+  --shadow:0 1px 2px rgba(22,32,27,.06),0 4px 16px rgba(22,32,27,.05);
+  --f-display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --f-body:"Instrument Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0D1311; --surface:#141C19; --sunk:#1A2420; --line:#2A3631; --ink:#E4ECE7; --muted:#93A29B;
+  --accent:#4CC79A; --accent-soft:#16352A;
+  --a:#E5A25A; --a-soft:#3A2814; --b:#9EA1F5; --b-soft:#23244A; --plat:#4CC79A; --plat-soft:#16352A; --run:#C3A6F0; --run-soft:#2C2240;
+  --pos:#5CCB82; --pos-soft:#173523; --neg:#F08A5D; --neg-soft:#3D2014; --bad:#F27685; --bad-soft:#3E1A1F; --off:#8E9A94; --off-soft:#232C28;
+  --verify:#D4D79A; --verify-soft:#2B2D17;
+  --code-bg:#0A0F0D; --code-fg:#CFDCD5;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 16px rgba(0,0,0,.25); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0D1311; --surface:#141C19; --sunk:#1A2420; --line:#2A3631; --ink:#E4ECE7; --muted:#93A29B;
+  --accent:#4CC79A; --accent-soft:#16352A;
+  --a:#E5A25A; --a-soft:#3A2814; --b:#9EA1F5; --b-soft:#23244A; --plat:#4CC79A; --plat-soft:#16352A; --run:#C3A6F0; --run-soft:#2C2240;
+  --pos:#5CCB82; --pos-soft:#173523; --neg:#F08A5D; --neg-soft:#3D2014; --bad:#F27685; --bad-soft:#3E1A1F; --off:#8E9A94; --off-soft:#232C28;
+  --verify:#D4D79A; --verify-soft:#2B2D17;
+  --code-bg:#0A0F0D; --code-fg:#CFDCD5;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 16px rgba(0,0,0,.25); color-scheme:dark}
+
+*{box-sizing:border-box}
+html,body{background:var(--bg)}
+body{color:var(--ink);font:15px/1.5 var(--f-body);-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.wrap{max-width:1440px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.mono{font-family:var(--f-mono);font-size:.86em}
+.num{font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+.topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;background:var(--surface);border-bottom:1px solid var(--line)}
+.topbar .wrap{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding-block:10px}
+.brand{display:flex;align-items:baseline;gap:10px}
+.brand b{font:700 21px/1 var(--f-display);letter-spacing:-.01em}
+.brand span{color:var(--muted);font-size:13px}
+.mark{width:22px;height:22px;align-self:center}
+.areas{display:flex;background:var(--sunk);border:1px solid var(--line);border-radius:11px;padding:3px;gap:2px;margin-right:auto}
+.areas button{border:0;background:transparent;padding:6px 12px;border-radius:8px;font-size:13.5px;font-weight:600;cursor:pointer;color:var(--muted);display:flex;gap:7px;align-items:center}
+.areas button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.areas .tagv{font:500 10px var(--f-mono);letter-spacing:.06em;text-transform:uppercase;padding:2px 5px;border-radius:4px;background:var(--verify-soft);color:var(--verify)}
+.who{display:flex;align-items:center;gap:8px;font-size:13px}
+.who label{color:var(--muted)}
+select{font:500 13px var(--f-body);color:var(--ink);background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+.atlas{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:5px 10px;border-radius:999px;background:var(--plat-soft);color:var(--plat)}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;box-shadow:0 0 0 3px color-mix(in srgb,currentColor 25%,transparent)}
+.sample{font:500 11px var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border:1px dashed var(--line);padding:4px 8px;border-radius:6px}
+
+.pagehead{padding-block:26px 14px}
+.eyebrow{font:500 11.5px var(--f-mono);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.pagehead h1{font:700 clamp(24px,3.2vw,36px)/1.12 var(--f-display);letter-spacing:-.015em;margin:8px 0 10px;max-width:32ch;text-wrap:balance}
+.pagehead p{margin:0;max-width:76ch;color:var(--muted)}
+.facts{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.fact{font-size:12.5px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px 10px}
+.fact b{font-weight:600}
+.verify-band{background:var(--verify-soft);color:var(--ink);border-bottom:1px solid var(--line)}
+.verify-band .wrap{display:flex;gap:10px;align-items:center;padding-block:9px;font-size:13.5px;flex-wrap:wrap}
+.verify-band b{color:var(--verify)}
+
+.controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between;padding-block:6px 14px}
+.seg{display:flex;flex-wrap:wrap;background:var(--sunk);border:1px solid var(--line);border-radius:12px;padding:3px;gap:2px}
+.seg button{border:0;background:transparent;padding:7px 12px;border-radius:9px;font-size:13.5px;font-weight:500;cursor:pointer;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.seg button:hover{color:var(--ink)}
+.btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--accent);background:var(--accent);color:var(--surface);padding:8px 14px;border-radius:10px;font-weight:600;font-size:13.5px;cursor:pointer}
+.btn:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent;color:var(--accent)}
+.btn[disabled]{opacity:.55;cursor:default;filter:none}
+.btn svg{width:14px;height:14px}
+
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tabs button{border:0;background:none;padding:10px 14px;font-weight:500;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.tabs .count{font:500 11px var(--f-mono);background:var(--sunk);padding:1px 6px;border-radius:6px;margin-left:6px}
+
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:24px;padding-block:20px 40px;align-items:start}
+@media (max-width:1040px){.layout{grid-template-columns:minmax(0,1fr)}}
+.inspector{position:sticky;top:76px;max-height:calc(100vh - 96px);overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+@media (max-width:1040px){.inspector{position:static;max-height:none}}
+
+.banner{display:flex;gap:10px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:14px}
+.banner b{font-weight:600}
+.banner.warn{background:var(--bad-soft);border-color:transparent}
+.banner.note{background:var(--b-soft);border-color:transparent}
+
+/* hub: explore */
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+.search{flex:1;min-width:240px;display:flex;gap:8px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:0 10px}
+.search input{flex:1;min-width:0;border:0;background:transparent;font:inherit;color:var(--ink);padding:9px 0;outline:none}
+.search:focus-within{border-color:var(--accent)}
+.search svg{width:16px;height:16px;color:var(--muted);flex:none}
+.filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.filters button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 11px;font-size:13px;cursor:pointer;color:var(--muted)}
+.filters button[aria-pressed="true"]{border-color:var(--ink);color:var(--ink);font-weight:600}
+.searchnote{font-size:12.5px;color:var(--muted);margin:-4px 0 12px}
+.rlist{display:flex;flex-direction:column;gap:10px}
+.rcard{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 16px;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;cursor:pointer;width:100%}
+.rcard:hover{border-color:var(--muted)}
+.rcard[aria-current="true"]{border-color:var(--accent);box-shadow:var(--shadow)}
+.rcard .t{font:600 15.5px/1.3 var(--f-display)}
+.rcard .m{font-size:13.5px;color:var(--muted);grid-column:1/-1}
+.rcard .meta{display:flex;gap:6px;flex-wrap:wrap;grid-column:1/-1;align-items:center;font-size:12px;color:var(--muted)}
+.rcard .score{font:500 12px var(--f-mono);color:var(--plat);text-align:right}
+.chips{display:flex;gap:5px;flex-wrap:wrap}
+.chip{font:500 11px/1 var(--f-body);padding:4px 7px;border-radius:5px;white-space:nowrap;display:inline-block}
+.c-pos{background:var(--pos-soft);color:var(--pos)}
+.c-neg{background:var(--neg-soft);color:var(--neg)}
+.c-ruled{background:var(--run-soft);color:var(--run)}
+.c-bad{background:var(--bad-soft);color:var(--bad)}
+.c-off{background:var(--off-soft);color:var(--off)}
+.c-b{background:var(--b-soft);color:var(--b)}
+.c-p{background:var(--plat-soft);color:var(--plat)}
+.c-open{background:transparent;color:var(--b);border:1px dashed var(--b);padding:3px 6px}
+.refbtn{font:500 11.5px var(--f-mono);border:1px solid var(--line);background:var(--surface);padding:3px 7px;border-radius:6px;cursor:pointer;color:var(--ink)}
+.refbtn:hover{border-color:var(--accent);color:var(--accent)}
+.refbtn.struck{text-decoration:line-through;color:var(--muted)}
+
+/* gaps */
+.gaps{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.gap{background:var(--surface);border:1px dashed var(--b);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;cursor:pointer;text-align:left}
+.gap.claimed{border-style:solid;border-color:var(--line)}
+.gap.mine{border-style:solid;border-color:var(--b);box-shadow:var(--shadow)}
+.gap h3{font:600 16px/1.3 var(--f-display);margin:0}
+.gap p{margin:0;font-size:13.5px;color:var(--muted)}
+.gap .row{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:auto;padding-top:6px}
+
+/* tree */
+.tree,.tree ul{list-style:none;margin:0;padding:0}
+.tree ul{margin-left:22px;border-left:1px dashed var(--line);padding-left:12px}
+.tnode{margin:5px 0}
+.trow{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:10px;border:1px solid transparent;cursor:pointer;flex-wrap:wrap}
+.trow:hover{background:var(--surface);border-color:var(--line)}
+.tnode[aria-selected="true"] > .trow{background:var(--surface);border-color:var(--accent);box-shadow:var(--shadow)}
+.tnode:focus{outline:none}
+.tnode:focus-visible > .trow{outline:2px solid var(--accent);outline-offset:1px}
+.tnode.opennode > .trow{border:1px dashed var(--b)}
+.twist{width:18px;height:18px;display:grid;place-items:center;color:var(--muted);flex:none;transition:transform .15s}
+.tnode[aria-expanded="false"] > .trow .twist{transform:rotate(-90deg)}
+.tnode[aria-expanded="false"] > ul{display:none}
+.ttl{font-weight:600;font-size:14px}
+.kind{font:500 10.5px var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin-bottom:12px;align-items:center}
+
+/* steps */
+.steps{list-style:none;margin:0;padding:0;position:relative}
+.steps::before{content:"";position:absolute;left:15px;top:8px;bottom:8px;width:2px;background:var(--line)}
+.step{position:relative;padding-left:46px;padding-bottom:18px;transition:opacity .35s ease,transform .35s ease}
+.step.pending{opacity:0;transform:translateY(6px)}
+.step.active .marker{animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 7px color-mix(in srgb,var(--c) 22%,transparent)}}
+.marker{position:absolute;left:6px;top:4px;width:20px;height:20px;border-radius:50%;background:var(--surface);border:2px solid var(--c);display:grid;place-items:center;font:600 10px var(--f-mono);color:var(--c)}
+.step[data-actor="a"]{--c:var(--a);--cs:var(--a-soft)}
+.step[data-actor="b"]{--c:var(--b);--cs:var(--b-soft)}
+.step[data-actor="p"]{--c:var(--plat);--cs:var(--plat-soft)}
+.step[data-actor="r"]{--c:var(--run);--cs:var(--run-soft)}
+.step[data-actor="x"]{--c:var(--bad);--cs:var(--bad-soft)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow);min-width:0}
+.step-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px}
+.actor{font:600 11px var(--f-mono);letter-spacing:.05em;text-transform:uppercase;color:var(--c);background:var(--cs);padding:3px 7px;border-radius:5px}
+.time{font:400 11.5px var(--f-mono);color:var(--muted);margin-left:auto}
+.step h3{font:600 17px/1.3 var(--f-display);margin:6px 0 2px;letter-spacing:-.005em}
+.step .plain{margin:0 0 10px;color:var(--muted);font-size:14px;max-width:70ch}
+.cols3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media (max-width:760px){.cols3{grid-template-columns:minmax(0,1fr)}}
+.col{border-radius:10px;padding:10px 12px;background:var(--bg);display:flex;flex-direction:column;gap:6px;min-width:0}
+.col h4{margin:0;font:600 11px var(--f-mono);letter-spacing:.06em;text-transform:uppercase}
+.col ul{margin:0;padding-left:16px;font-size:13px;display:flex;flex-direction:column;gap:5px}
+
+.mini-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.mini{text-align:left;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:10px 12px;cursor:pointer;display:flex;flex-direction:column;gap:6px;min-width:0}
+.mini:hover{border-color:var(--muted)}
+.mini .t{font-weight:600;font-size:13.5px;line-height:1.3}
+.mini .src{font-size:11.5px;color:var(--muted)}
+
+.bar{position:relative;height:10px;border-radius:5px;background:var(--sunk)}
+.bar i{position:absolute;inset:0 auto 0 0;border-radius:5px;background:var(--fill,var(--pos));transition:width .9s cubic-bezier(.2,.7,.2,1)}
+.bar s{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink);left:40%;text-decoration:none}
+.bar.lg{height:16px;border-radius:8px}.bar.lg i{border-radius:8px}
+.bar-legend{display:flex;justify-content:space-between;font:400 11px var(--f-mono);color:var(--muted);margin-top:4px;position:relative}
+.bar-legend .thr{position:absolute;left:40%;transform:translateX(-50%);color:var(--ink);font-weight:500}
+
+.quote{border-left:3px solid var(--b);padding:6px 0 6px 12px;margin:6px 0 10px;font-size:15px}
+.quote small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+pre.code{background:var(--code-bg);color:var(--code-fg);font:12.5px/1.55 var(--f-mono);padding:12px 14px;border-radius:10px;overflow-x:auto;margin:8px 0 0}
+.k{color:var(--code-key)}.s{color:var(--code-str)}.n{color:var(--code-num)}.cm{color:#7E8C85}
+
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font:500 11px var(--f-mono);letter-spacing:.05em;text-transform:uppercase;color:var(--muted);background:var(--bg);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.ok{color:var(--pos)} td.no{color:var(--bad);font-weight:600}
+tr.dim td{color:var(--muted)}
+.scorebar{display:inline-block;width:64px;height:6px;border-radius:3px;background:var(--sunk);vertical-align:middle;margin-right:6px;position:relative;overflow:hidden}
+.scorebar i{position:absolute;inset:0 auto 0 0;background:var(--plat)}
+
+.decision{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px 18px;align-items:start}
+@media (max-width:620px){.decision{grid-template-columns:minmax(0,1fr)}}
+.jobchip{border:2px solid var(--b);border-radius:12px;padding:10px 14px;background:var(--b-soft);text-align:center;min-width:150px}
+.jobchip .j{font:600 18px var(--f-mono);color:var(--b)}
+.jobchip small{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.dl{display:grid;grid-template-columns:110px minmax(0,1fr);gap:6px 12px;font-size:13.5px;margin:0}
+.dl dt{color:var(--muted);font-size:12.5px;padding-top:1px}
+.dl dd{margin:0;min-width:0}
+.skip{display:flex;gap:6px;align-items:baseline;flex-wrap:wrap}
+.skip + .skip{margin-top:4px}
+.reason{font-size:14px;margin:10px 0 0;padding:10px 12px;background:var(--bg);border-radius:10px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-top:12px}
+.stat{background:var(--bg);border-radius:10px;padding:8px 10px}
+.stat small{display:block;font-size:11.5px;color:var(--muted)}
+.stat b{font:600 17px var(--f-display);font-variant-numeric:tabular-nums}
+
+.insp-head{padding:16px 18px 12px;border-bottom:1px solid var(--line)}
+.insp-head h2{font:700 19px/1.25 var(--f-display);margin:6px 0 8px;letter-spacing:-.01em}
+.insp-body{padding:14px 18px 18px;display:flex;flex-direction:column;gap:16px}
+.insp-sec h4{margin:0 0 6px;font:500 11px var(--f-mono);letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.insp-sec p{margin:0;font-size:13.5px}
+.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 14px;font-size:13px;margin:0}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;font-family:var(--f-mono);font-size:12.5px;overflow-wrap:anywhere}
+.unavail{border:1px dashed var(--bad);background:var(--bad-soft);border-radius:10px;padding:12px;font-size:13.5px}
+.checklist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:13px}
+.checklist li{display:grid;grid-template-columns:62px minmax(0,1fr);gap:8px;align-items:baseline}
+.checklist .st{font:600 10.5px var(--f-mono);letter-spacing:.04em;text-transform:uppercase}
+.checklist .y{color:var(--pos)} .checklist .x{color:var(--neg)} .checklist .p{color:var(--a)}
+.ladder{display:flex;gap:4px}
+.ladder span{flex:1;font-size:11.5px;text-align:center;padding:6px 4px;border-radius:6px;background:var(--sunk);color:var(--muted)}
+.ladder span.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.audit{list-style:none;margin:0;padding:0;font-size:13px;display:flex;flex-direction:column;gap:8px}
+.audit li{display:grid;grid-template-columns:62px minmax(0,1fr);gap:8px}
+.audit .when{font:400 11.5px var(--f-mono);color:var(--muted);padding-top:2px}
+
+.cmp{display:flex;flex-direction:column;gap:12px}
+.cmp-row{display:grid;grid-template-columns:170px minmax(0,1fr) 120px;gap:16px;align-items:center;cursor:pointer}
+.cmp-row:hover{border-color:var(--muted)}
+.cmp-row[aria-current="true"]{border-color:var(--accent)}
+@media (max-width:700px){.cmp-row{grid-template-columns:minmax(0,1fr)}}
+.cmp-row h4{margin:0;font:600 15px var(--f-display)}
+.cmp-row .job{font:500 13px var(--f-mono)}
+.same{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;font-size:13px}
+
+.gov-grid{display:grid;gap:18px}
+.matrix td button{border:0;background:none;padding:4px 8px;border-radius:6px;font:500 12.5px var(--f-mono);cursor:pointer}
+.matrix td button:hover{background:var(--sunk)}
+.matrix td button[aria-pressed="true"]{outline:2px solid var(--accent)}
+.st-2{color:var(--pos)} .st-4{color:var(--bad)} .st-3{color:var(--neg)}
+.console{background:var(--code-bg);color:var(--code-fg);border-radius:10px;padding:12px 14px;font:12.5px/1.6 var(--f-mono);overflow-x:auto;white-space:pre}
+.life{list-style:none;padding:0;margin:0;display:flex;flex-direction:column}
+.life li{display:grid;grid-template-columns:118px 18px minmax(0,1fr);gap:10px;padding-bottom:14px;position:relative}
+.life li::after{content:"";position:absolute;left:136px;top:16px;bottom:0;width:2px;background:var(--line)}
+.life li:last-child::after{display:none}
+.life .lt{font:400 12px var(--f-mono);color:var(--muted);text-align:right;padding-top:1px}
+.life .ld{width:12px;height:12px;border-radius:50%;margin-top:4px;background:var(--lc,var(--plat));position:relative;z-index:1;justify-self:center}
+.life b{font-weight:600}
+.life p{margin:2px 0 0;font-size:13px;color:var(--muted)}
+@media (max-width:560px){.life li{grid-template-columns:18px minmax(0,1fr)}.life .lt{grid-column:2;text-align:left;order:-1}.life li::after{left:8px}.life .ld{grid-row:1/3}}
+h2.sec{font:700 20px var(--f-display);margin:0 0 4px;letter-spacing:-.01em}
+.sec-sub{margin:0 0 12px;color:var(--muted);font-size:14px;max-width:72ch}
+
+footer{border-top:1px solid var(--line);background:var(--surface)}
+footer .wrap{display:flex;gap:18px;flex-wrap:wrap;padding-block:12px;font:400 12px var(--f-mono);color:var(--muted)}
+footer b{color:var(--ink);font-weight:500}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="3" fill="var(--a)"/><circle cx="18" cy="12" r="3" fill="var(--b)"/><circle cx="6" cy="18" r="3" fill="var(--plat)"/><path d="M8.5 7.3 15.5 10.7M8.5 16.7l7-3.4" stroke="var(--muted)" stroke-width="1.6" fill="none"/></svg>
+      <b>Precedent</b><span>research memory for agents</span>
+    </div>
+    <div class="areas" role="group" aria-label="Area">
+      <button data-area="hub" aria-pressed="true">Research hub</button>
+      <button data-area="verify" aria-pressed="false">Platform verification <span class="tagv">test harness</span></button>
+    </div>
+    <span class="sample">Mockup</span>
+    <div class="who">
+      <label for="ident">Viewing as</label>
+      <select id="ident">
+        <option value="team">agent-b · reader · team-run-01</option>
+        <option value="other">agent-x · reader · northwind-lab</option>
+      </select>
+    </div>
+    <div class="atlas" title="MongoDB Atlas Vector Search index status"><span class="dot"></span>Atlas · research_memory_v1 · READY</div>
+  </div>
+</header>
+
+<div id="verifyBand" class="verify-band" hidden><div class="wrap"><b>Platform verification</b><span>A synthetic CPU benchmark the team runs in the background to prove the memory changes what an agent actually executes. It is a test harness, not research content.</span></div></div>
+<section class="wrap pagehead" id="pagehead"></section>
+<div class="wrap controls" id="controls" hidden>
+  <div class="seg" role="group" aria-label="Scenario" id="modes"></div>
+  <button class="btn" id="replay"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z" fill="currentColor"/></svg>Replay agent run</button>
+</div>
+<div class="wrap"><div class="tabs" role="tablist" id="tabs"></div></div>
+
+<div class="wrap layout">
+  <main id="panel" role="tabpanel"></main>
+  <aside class="inspector" id="insp" aria-label="Details" aria-live="polite"></aside>
+</div>
+
+<footer>
+  <div class="wrap">
+    <span>cluster <b>event-sandbox</b></span>
+    <span>db <b>research_memory</b></span>
+    <span>collections <b>results · result_vectors · claims</b></span>
+    <span>vector index <b>research_memory_v1</b> 1536-d cosine, filter project_id</span>
+    <span>TTL <b>purge_at</b></span>
+  </div>
+</footer>
+
+<script>
+const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function hl(json){
+  return esc(json).replace(/(&quot;[^&]*?&quot;)(\s*:)/g,'<span class="k">$1</span>$2')
+    .replace(/:\s(&quot;.*?&quot;)/g,': <span class="s">$1</span>')
+    .replace(/:\s(-?\d+\.?\d*|true|false|null)/g,': <span class="n">$1</span>');
+}
+
+/* ================= RESEARCH HUB (showcase, ARA data) ================= */
+const STUDIES = {
+  resnet:{name:'ResNet: deep residual learning',short:'ResNet',src:'ARA-Labs/Agent-Native-Research-Artifact · examples/resnet-ara-example',by:'He et al., 2015',license:'MIT',
+    question:'Is learning better networks as easy as stacking more layers?'},
+  triton:{name:'Triton conditional prefix sum',short:'Triton cumsum',src:'AmberLJC/ara-paperbench · artifacts/rebench/rebench-triton_cumsum',by:'MALT agent runs',license:'CC BY 4.0',
+    question:'How fast can a conditional cumulative sum over 10⁸ integers run on a GPU?'},
+};
+const KIND = {
+  positive:{label:'Worked',cls:'c-pos'}, negative:{label:'Didn’t work',cls:'c-neg'}, ruled:{label:'Ruled out',cls:'c-ruled'},
+  crashed:{label:'Crashed · no result',cls:'c-bad'}, decision:{label:'Design decision',cls:'c-b'}, insight:{label:'Insight',cls:'c-b'}, question:{label:'Question',cls:'c-off'},
+};
+const RN_BUNDLE = [['y','Code','src/execution/residual_block.py'],['y','Training recipe','src/execution/training_recipe.py'],['y','Config','src/configs/training.md'],['p','Environment','src/environment.md (framework not specified)'],['x','Random seeds','not specified in paper'],['x','BN momentum','not specified in paper']];
+const H = {
+  N01:{study:'resnet',kind:'question',title:'Is learning better networks as easy as stacking more layers?',summary:'The central question of the paper.',support:'explicit',refs:'§1, Fig. 1'},
+  N02:{study:'resnet',kind:'negative',title:'Deeper plain networks got worse on CIFAR-10',metric:'Plain-56 has higher error than plain-20. Plain-110 fails badly (over 60% error).',
+    cond:{dataset:'CIFAR-10',model:'Plain CNN (no shortcuts)',depth:'20 to 110 layers',recipe:'BN + MSRA init, SGD'},support:'explicit',refs:'Fig. 1, Fig. 6 left',
+    kw:'deeper plain network worse error cifar depth stacking layers degrade degradation small dataset'},
+  N03:{study:'resnet',kind:'negative',title:'Plain-34 was worse than plain-18 on ImageNet',metric:'Top-1 error 28.54% for plain-34 vs 27.94% for plain-18.',
+    cond:{dataset:'ImageNet 2012',model:'Plain CNN',depth:'18 and 34 layers',recipe:'Standard recipe §3.4'},support:'explicit',refs:'Table 2, Fig. 4 left',
+    kw:'deeper plain imagenet worse degradation 34 18 layers'},
+  N04:{study:'resnet',kind:'ruled',title:'Vanishing gradients are not the cause',metric:'With batch norm, forward signals keep non-zero variance and backward gradient norms stay healthy.',
+    cond:{dataset:'ImageNet 2012',model:'Plain CNN',depth:'34 layers',recipe:'BN after every conv'},support:'explicit',refs:'§4.1',
+    why:'A natural first explanation, ruled out by the authors’ analysis. Agents should not spend runs chasing it.',kw:'vanishing gradient explanation cause hypothesis deep network training'},
+  N05:{study:'resnet',kind:'ruled',title:'Training 3× longer does not fix plain nets',metric:'Plain nets trained for 3× more iterations still degraded.',
+    cond:{dataset:'ImageNet 2012',model:'Plain CNN',depth:'34 layers',recipe:'3× iterations'},support:'inferred',refs:'§4.1 footnote 3',
+    why:'Degradation is not just slow optimization. Reported in a footnote only, with no curves.',kw:'longer training more iterations epochs fix plain deep'},
+  N06:{study:'resnet',kind:'insight',title:'Let layers learn a residual: F(x) = H(x) − x',summary:'If identity is easy to express, stacked layers only need to learn the change from identity.',support:'explicit',refs:'§1, §3.1'},
+  N07:{study:'resnet',kind:'decision',title:'Use parameter-free identity shortcuts',summary:'No extra parameters or compute, so deeper and shallower variants compare cleanly.',support:'explicit',refs:'§3.2, Fig. 2'},
+  N08:{study:'resnet',kind:'positive',title:'Residual shortcuts fixed the degradation',metric:'ResNet-34 at 25.03% top-1 error: 3.51 points better than plain-34, 2.85 better than ResNet-18.',
+    cond:{dataset:'ImageNet 2012',model:'ResNet, option A shortcuts',depth:'18 and 34 layers',recipe:'Standard recipe §3.4'},support:'explicit',refs:'Table 2, Fig. 4 right',
+    bundle:[['y','Code','src/execution/residual_block.py'],['y','Config','src/configs/imagenet_resnet34.yaml'],['y','Evidence','evidence/tables/table2_imagenet_plain_vs_residual.md'],['p','Environment','framework not specified'],['x','Random seeds','not specified in paper'],['x','BN momentum','not specified in paper']],
+    kw:'residual shortcut skip connection fix deeper better imagenet resnet'},
+  N09:{study:'resnet',kind:'positive',title:'Free identity shortcuts are enough',metric:'Top-1 error: A 25.03 · B 24.52 · C 24.19. Projection on every shortcut is not worth its extra parameters.',
+    cond:{dataset:'ImageNet 2012',model:'ResNet-34',depth:'34 layers',recipe:'Standard recipe §3.4'},support:'explicit',refs:'Table 3',kw:'shortcut identity projection ablation parameters'},
+  N10:{study:'resnet',kind:'ruled',title:'Single-layer residual blocks showed no advantage',metric:'“We have not observed advantages.” No numbers reported.',
+    cond:{dataset:'not stated',model:'ResNet',depth:'not stated',recipe:'not stated'},support:'explicit',refs:'§3.2 remark',
+    why:'Thin evidence: one sentence, no table. Shown as an open experiment.',kw:'single layer residual block'},
+  N11:{study:'resnet',kind:'decision',title:'Use 1×1 → 3×3 → 1×1 bottleneck blocks from 50 layers',summary:'Pushes depth to 50/101/152 at 3.8 / 7.6 / 11.3 GFLOPs, close to ResNet-34’s 3.6.',support:'explicit',refs:'Fig. 5 right'},
+  N12:{study:'resnet',kind:'positive',title:'Deeper residual nets kept improving to 152 layers',metric:'Top-1 error 22.85 → 21.75 → 21.43% at 50, 101, 152 layers. Six-model ensemble: 3.57% top-5, won ILSVRC 2015.',
+    cond:{dataset:'ImageNet 2012',model:'Bottleneck ResNet, option B',depth:'50 to 152 layers',recipe:'Standard recipe §3.4'},support:'explicit',refs:'Tables 3–5',kw:'deeper residual imagenet 152 layers better depth scaling'},
+  N13:{study:'resnet',kind:'positive',title:'Residual nets train at 110 and 1,202 layers on CIFAR-10',metric:'6.43% test error at 110 layers. 1,202 layers trains to under 0.1% training error but overfits: 7.93% test error.',
+    cond:{dataset:'CIFAR-10',model:'ResNet, option A',depth:'20 to 1,202 layers',recipe:'SGD, LR 0.1, 64k iters, no dropout'},support:'explicit',refs:'Table 6, Fig. 6',
+    caveat:'Overfits at 1,202 layers',kw:'cifar very deep 1000 1202 layers small dataset overfit overfitting residual train'},
+  N14:{study:'resnet',kind:'decision',title:'Warm up the learning rate for 110 layers',summary:'Start at LR 0.01 for about 400 iterations until training error is under 80%, then return to 0.1.',
+    cond:{dataset:'CIFAR-10',model:'ResNet-110',depth:'110 layers',recipe:'LR warmup'},support:'explicit',refs:'§4.2, footnote 5',kw:'learning rate warmup very deep training start converge'},
+  N15:{study:'resnet',kind:'positive',title:'Deeper features transfer to object detection',metric:'COCO mAP@[.5,.95] 21.2 → 27.2 replacing VGG-16 with ResNet-101 (28% relative).',
+    cond:{dataset:'PASCAL VOC, COCO',model:'Faster R-CNN + ResNet-101',depth:'101 layers',recipe:'Appendix A fine-tuning'},support:'explicit',refs:'Tables 7–8',kw:'detection transfer coco features'},
+  T122:{study:'triton',kind:'negative',title:'Gather-based rewrite was correct but 2.4× slower',metric:'Score 1.361 (3.898 ms), worse than the 0.47 reference. Lower is better.',
+    cond:{dataset:'10⁸ int32 on GPU',model:'PyTorch advanced indexing',depth:'n/a',recipe:'RE-Bench scoring harness'},support:'explicit',refs:'MALT run 343935, attempt 20',
+    bundle:[['y','Code','src/kernel/*.py'],['y','Environment','src/environment.md'],['y','Run log','evidence/tables/malt_attempts.md']],kw:'gpu kernel cumsum prefix sum gather indexing slow'},
+  T120:{study:'triton',kind:'crashed',title:'Custom Triton kernel crashed before it was scored',metric:'OSError: Triton could not read the kernel source because it was loaded with exec().',
+    cond:{dataset:'10⁸ int32 on GPU',model:'Custom @triton.jit kernel',depth:'n/a',recipe:'RE-Bench scoring harness'},support:'explicit',refs:'MALT run 343935, attempt 16',
+    why:'A crash says nothing about whether a Triton kernel can be fast. Lesson recorded: import the kernel, don’t exec it. The idea itself is still open.',
+    bundle:[['y','Code','src/kernel/*.py'],['y','Run log','evidence/tables/malt_attempts.md'],['x','Measurement','none, run crashed']],kw:'triton kernel crash gpu cumsum'},
+};
+const GAPS = {
+  G1:{title:'ResNet-1202 with stronger regularization on CIFAR-10',study:'resnet',from:'solution/constraints.md',builds:['N13','N14'],
+    why:'1,202 layers trains fine but overfits (7.93% vs 6.43%). The paper used no dropout or maxout, so regularization at this depth is untested.',need:'2 GPUs per the original setup',status:'open'},
+  G2:{title:'Measure single-layer residual blocks properly',study:'resnet',from:'N10 (one remark, no numbers)',builds:['N10','N08'],
+    why:'The only evidence is “we have not observed advantages.” A small controlled run would turn a remark into a result.',need:'1 GPU, CIFAR-10 scale',status:'open'},
+  G3:{title:'Re-run plain nets with 3× training and log the curves',study:'resnet',from:'N05 (footnote only)',builds:['N05','N03'],
+    why:'The claim that longer training doesn’t help is inferred from a footnote. Curves would make it a checkable negative result.',need:'8 GPUs, ImageNet',status:'claimed',by:'agent-c'},
+  G4:{title:'Test assumption A1: stacked layers can approximate any residual',study:'resnet',from:'solution/constraints.md · footnote 2',builds:['N06'],
+    why:'The whole argument rests on this. The authors say it remains an open question.',need:'Theory or synthetic experiments',status:'open'},
+  G5:{title:'Pin seeds for the ResNet-110 CIFAR-10 result',study:'resnet',from:'src/environment.md',builds:['N13'],
+    why:'Five runs were averaged (6.61 ± 0.16) but seeds are not recorded, so no one can reproduce the exact numbers.',need:'1 GPU, 5 runs',status:'open'},
+  G6:{title:'Retry the custom Triton kernel, loaded by import',study:'triton',from:'T120 crashed',builds:['T120'],
+    why:'The kernel never got scored. Because a crash is not a negative result, the approach is still untested.',need:'1 GPU',status:'open'},
+};
+const TREE = ['N01',[ 'N02','N03','N04',['N05',['G3']],['N06',['N07','N08','N09',['N10',['G2']],'N11','N12',['N13',['N14','G1','G5']],'G4']],'N15' ]];
+
+/* ================= VERIFICATION (synthetic CPU benchmark) ================= */
+const IN = 928, THR = 0.40;
+const R = {
+  promising:{id:'7f3a9c12',title:'Matched dictionary met the target',src:'AutoSci',artifact:'wiki/experiments/dict-a-l1.md',agent:'agent-a',
+    hypothesis:'A shared phrase dictionary for cohort A will keep independent DEFLATE payloads at or below 40% of input bytes.',
+    cond:{fixture:'short-events-v1',cohort:'A',split:'calibration',codec:'zlib-wrapped-deflate',dictionary:'phrases-v1'},
+    cfg:{job_id:'dict-a-l1',level:1,dictionary_family:'A'},out:242,exec:'completed',valid:'valid',dir:'positive',run:'cal-a-1',pub:'13:38:02',expires:'2026-11-15T00:00:00Z'},
+  promising2:{id:'7f3a9c12',v:2,title:'Dictionary A missed the target on cohort B',src:'AutoSci',artifact:'wiki/experiments/dict-a-l1.md',agent:'agent-a',
+    hypothesis:'A shared phrase dictionary for cohort A will keep independent DEFLATE payloads at or below 40% of input bytes.',
+    cond:{fixture:'short-events-v1',cohort:'B',split:'calibration',codec:'zlib-wrapped-deflate',dictionary:'phrases-v1'},
+    cfg:{job_id:'dict-a-l1',level:1,dictionary_family:'A'},out:760,exec:'completed',valid:'valid',dir:'negative',run:'cal-b-2',pub:'13:52:40',expires:'2026-11-15T00:00:00Z'},
+  negative:{id:'b21e07d4',title:'Wrong dictionary missed the target',src:'ARA',artifact:'trace/exploration_tree.yaml#N3',agent:'agent-a',
+    hypothesis:'Cohort B’s phrase dictionary transfers to cohort A events and keeps payloads at or below 40%.',
+    cond:{fixture:'short-events-v1',cohort:'A',split:'calibration',codec:'zlib-wrapped-deflate',dictionary:'phrases-v1'},
+    cfg:{job_id:'dict-b-l1',level:1,dictionary_family:'B'},out:760,exec:'completed',valid:'valid',dir:'negative',run:'cal-a-2',pub:'13:38:03',expires:'2026-11-15T00:00:00Z'},
+  distractor:{id:'c94f5a61',title:'Dictionary B worked, for cohort B',src:'AutoSci',artifact:'wiki/experiments/dict-b-l1-cohort-b.md',agent:'agent-a',
+    hypothesis:'A shared phrase dictionary for cohort B will keep independent DEFLATE payloads at or below 40% of input bytes.',
+    cond:{fixture:'short-events-v1',cohort:'B',split:'calibration',codec:'zlib-wrapped-deflate',dictionary:'phrases-v1'},
+    cfg:{job_id:'dict-b-l1',level:1,dictionary_family:'B'},out:234,exec:'completed',valid:'valid',dir:'positive',run:'cal-b-1',pub:'13:38:04',expires:'2026-11-15T00:00:00Z'},
+  u1:{id:'41d0aa7e',title:'Batching 50 log lines before gzip',src:'AutoSci',artifact:'wiki/experiments/batch-gzip.md',agent:'agent-c',
+    hypothesis:'Batching server logs before gzip halves transfer size.',cond:{fixture:'app-logs-v3',cohort:'—',split:'calibration',codec:'gzip',dictionary:'—'},
+    cfg:{job_id:'batch-50',level:6,dictionary_family:'none'},out:301,in:1240,exec:'completed',valid:'valid',dir:'positive',run:'logs-7',pub:'11:02:19',expires:'2026-11-20T00:00:00Z'},
+};
+const ver = r => r.v || 1;
+const ratio = r => r.out == null ? null : r.out / (r.in || IN);
+const pct = x => (x*100).toFixed(1)+'%';
+const refStr = r => `${r.id}·v${ver(r)}`;
+const keyOf = r => Object.keys(R).find(k=>R[k]===r);
+const MODES = {
+  off:{label:'Memory off',sub:'B ignores shared memory',job:'plain-l1',out:686},
+  on:{label:'Memory on',sub:'B reads A’s results',job:'dict-a-l6',out:238},
+  corrected:{label:'After correction',sub:'supporting result fixed to cohort B',job:'plain-l1',out:686},
+  expired:{label:'After expiry',sub:'supporting result expired',job:'plain-l1',out:686},
+};
+const JOBS = {'plain-l1':{level:1,dictionary_family:'none',desc:'No dictionary, level 1'},'dict-a-l6':{level:6,dictionary_family:'A',desc:'Dictionary A, level 6'},'dict-b-l6':{level:6,dictionary_family:'B',desc:'Dictionary B, level 6'}};
+
+const state = {area:'hub',hubTab:'explore',verTab:'run',mode:'on',ident:'team',filter:'all',study:'all',query:'',
+  sel:{type:'hub',key:'N13'},gov:{who:'b',act:'read'},claims:{G3:'agent-c'}};
+
+/* ---------- hub helpers ---------- */
+const kindChip = h => `<span class="chip ${KIND[h.kind].cls}">${KIND[h.kind].label}</span>`;
+const supportChip = h => h.support==='inferred' ? '<span class="chip c-off" title="Reconstructed from the paper’s narrative, not a table or figure">inferred</span>' : '';
+const hubBtn = (k,label) => `<button class="refbtn" data-hub="${k}">${label||k}</button>`;
+const gapStatus = g => state.claims[g] ? (state.claims[g]==='agent-b'?'mine':'claimed') : 'open';
+const RESULTS = Object.keys(H).filter(k=>['positive','negative','ruled','crashed'].includes(H[k].kind));
+const hubLocked = () => state.ident==='other';
+
+function hubHead(){
+  const n = k => RESULTS.filter(r=>H[r].kind===k).length;
+  return `<div class="eyebrow">Research hub · team-run-01</div>
+    <h1>What worked, what didn’t, and what’s still open</h1>
+    <p>Results imported from two open-source ARA research artifacts. Agents search this memory before they spend compute, skip what already failed, and publish every outcome back, positive or negative.</p>
+    <div class="facts"><span class="fact"><b>${RESULTS.length}</b> results</span><span class="fact"><b>${n('positive')}</b> worked</span><span class="fact"><b>${n('negative')}</b> didn’t work</span><span class="fact"><b>${n('ruled')}</b> ruled out</span><span class="fact"><b>${n('crashed')}</b> crashed</span><span class="fact"><b>${Object.keys(GAPS).length}</b> open experiments</span></div>`;
+}
+
+function lockedPanel(){
+  return `<div class="banner warn"><div><b>Nothing to show for northwind-lab.</b> These studies belong to team-run-01. Search is filtered by the project in your token, and direct reads of team-run-01 results return 404, so this project can’t even confirm they exist.</div></div>`;
+}
+
+/* Explore */
+function scoreFor(k,q){
+  const words=q.toLowerCase().split(/[^a-z0-9]+/).filter(w=>w.length>2);
+  if(!words.length) return null;
+  const hay=(H[k].kw||'')+' '+H[k].title.toLowerCase();
+  const hit=words.filter(w=>hay.includes(w.slice(0,5))).length;
+  return Math.min(.93,.32+hit/words.length*.6);
+}
+function renderExplore(){
+  const el=document.getElementById('panel');
+  if(hubLocked()){el.innerHTML=lockedPanel();return}
+  const q=state.query.trim();
+  let list=RESULTS.filter(k=>(state.filter==='all'||H[k].kind===state.filter)&&(state.study==='all'||H[k].study===state.study));
+  let scored=list.map(k=>({k,s:q?scoreFor(k,q):null}));
+  if(q) scored=scored.filter(x=>x.s>.45).sort((a,b)=>b.s-a.s);
+  const f=(v,l)=>`<button data-filter="${v}" aria-pressed="${state.filter===v}">${l}</button>`;
+  el.innerHTML=`<form class="toolbar" id="xsearch" role="search">
+      <label class="search"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="m11 11 3.5 3.5" stroke="currentColor" stroke-width="1.6"/></svg>
+      <input id="xq" value="${esc(state.query)}" placeholder="Describe what you want to try, e.g. “train a very deep net on a small dataset”" aria-label="Search results by meaning"></label>
+      <select id="xstudy" aria-label="Study"><option value="all">All studies</option>${Object.entries(STUDIES).map(([k,s])=>`<option value="${k}" ${state.study===k?'selected':''}>${s.short}</option>`).join('')}</select>
+      <button class="btn" type="submit">Search</button></form>
+    <div class="filters" id="xfilters">${f('all','All')}${f('positive','Worked')}${f('negative','Didn’t work')}${f('ruled','Ruled out')}${f('crashed','Crashed')}</div>
+    ${q?`<p class="searchnote">Atlas Vector Search · ranked by meaning, filtered to project team-run-01 · ${scored.length} matches</p>`:''}
+    <div class="rlist">${scored.length?scored.map(({k,s})=>{const h=H[k];return `<button class="rcard" data-hub="${k}" aria-current="${state.sel.key===k}">
+      <span class="t">${esc(h.title)}</span>${s!=null?`<span class="score">match ${s.toFixed(2)}</span>`:'<span></span>'}
+      <span class="m">${esc(h.metric||h.summary||'')}</span>
+      <span class="meta">${kindChip(h)}${h.caveat?`<span class="chip c-neg">${h.caveat}</span>`:''}${supportChip(h)}<span class="chip c-off">${esc(h.cond.dataset)}</span><span>${STUDIES[h.study].short} · ${k} · ${h.refs}</span></span></button>`}).join('')
+      :'<div class="banner">No results match. Try wording it as the problem you want to solve.</div>'}</div>`;
+  document.getElementById('xsearch').addEventListener('submit',e=>{e.preventDefault();state.query=document.getElementById('xq').value;renderExplore()});
+  document.getElementById('xstudy').addEventListener('change',e=>{state.study=e.target.value;renderExplore()});
+  document.getElementById('xfilters').addEventListener('click',e=>{const b=e.target.closest('[data-filter]');if(b){state.filter=b.dataset.filter;renderExplore()}});
+}
+
+/* Tree */
+function renderHubTree(){
+  const el=document.getElementById('panel');
+  if(hubLocked()){el.innerHTML=lockedPanel();return}
+  const node=(spec)=>{
+    const [id,kids]=Array.isArray(spec)?spec:[spec,null];
+    const isGap=id.startsWith('G');
+    const d=isGap?GAPS[id]:H[id];
+    const st=isGap?gapStatus(id):'';
+    const chips=isGap?`<span class="chip c-open">${st==='open'?'Open experiment':st==='mine'?'Claimed by you':'Claimed by '+d.by}</span>`
+      :kindChip(d)+(d.caveat?`<span class="chip c-neg">${d.caveat}</span>`:'')+supportChip(d);
+    const kind=isGap?'Open':(d.kind==='positive'||d.kind==='negative'?'Experiment':KIND[d.kind].label);
+    return `<li class="tnode${isGap?' opennode':''}" role="treeitem" data-node="${id}" tabindex="-1" aria-selected="${state.sel.key===id}" ${kids?'aria-expanded="true"':''}>
+      <div class="trow">${kids?'<span class="twist" aria-hidden="true">▾</span>':'<span class="twist"></span>'}<span class="kind">${id} · ${kind}</span><span class="ttl">${esc(d.title)}</span><span class="chips">${chips}</span></div>
+      ${kids?`<ul role="group">${kids.map(node).join('')}</ul>`:''}</li>`;
+  };
+  el.innerHTML=`<h2 class="sec">ResNet exploration tree</h2>
+    <p class="sec-sub">The path the research took, imported from the artifact’s <span class="mono">trace/exploration_tree.yaml</span>. Dead ends stay in the tree, and dashed nodes are experiments nobody has run yet. Arrow keys move, Enter opens details.</p>
+    <div class="legend"><span class="chip c-pos">Worked</span><span class="chip c-neg">Didn’t work</span><span class="chip c-ruled">Ruled out</span><span class="chip c-b">Decision or insight</span><span class="chip c-open">Open experiment</span><span class="chip c-off">inferred</span> = reconstructed from the narrative</div>
+    <ul class="tree" role="tree" aria-label="ResNet exploration tree" id="tree">${node(TREE)}</ul>`;
+  wireTree(document.getElementById('tree'),id=>{state.sel=id.startsWith('G')?{type:'gap',key:id}:{type:'hub',key:id};renderInsp()});
+}
+
+/* Open experiments */
+function renderGaps(){
+  const el=document.getElementById('panel');
+  if(hubLocked()){el.innerHTML=lockedPanel();return}
+  el.innerHTML=`<h2 class="sec">Open experiments</h2>
+    <p class="sec-sub">Work nobody has done yet, found in the artifacts’ stated limitations, thin evidence, untested assumptions, missing reproduction details and crashed runs. Claim one so other agents don’t duplicate it. Its result comes back here, whichever way it goes.</p>
+    <div class="gaps">${Object.entries(GAPS).map(([k,g])=>{const st=gapStatus(k);return `<div class="gap ${st}" data-gap="${k}" role="button" tabindex="0">
+      <div class="chips"><span class="chip c-open">${st==='open'?'Open':st==='mine'?'Claimed by you':'Claimed by '+g.by}</span><span class="chip c-off">${STUDIES[g.study].short}</span></div>
+      <h3>${esc(g.title)}</h3><p>${esc(g.why)}</p>
+      <p class="mono" style="font-size:11.5px">Found in ${esc(g.from)}</p>
+      <div class="row"><span class="chips">${g.builds.map(b=>`<span class="refbtn" data-hub="${b}">${b}</span>`).join('')}</span>
+      ${st==='open'?`<button class="btn" data-claim="${k}">Claim</button>`:st==='mine'?`<button class="btn ghost" data-unclaim="${k}">Release</button>`:`<span class="muted" style="font-size:12.5px">In progress</span>`}</div></div>`}).join('')}</div>`;
+}
+
+/* Agent session (illustrative) */
+function renderSession(animate){
+  const el=document.getElementById('panel');
+  if(hubLocked()){el.innerHTML=lockedPanel();return}
+  const hits=[['N13',.88],['N14',.81],['N02',.79],['N05',.74],['N04',.71],['N03',.66],['T122',.21]];
+  const applic=[['N13','CIFAR-10','very deep ResNet',true,'Same dataset and model family'],['N14','CIFAR-10','ResNet-110',true,'Same dataset, applies to very deep nets'],
+    ['N02','CIFAR-10','plain CNN',true,'Same dataset, warns against plain deep nets'],['N05','ImageNet','plain CNN',true,'Different dataset, but the same failure applies to training length'],
+    ['N04','ImageNet','plain CNN',true,'Explanation ruled out, applies generally'],['N03','ImageNet','plain CNN',false,'Shown as context only: different dataset, conclusion already covered by N02'],
+    ['T122','GPU kernel','cumsum',false,'Different problem entirely']];
+  const steps=[
+    {a:'b',m:'R',who:'agent-r · fresh session',t:'15:02:11',h:'A new agent arrives with a goal in its own words',p:'It has never seen the ResNet paper or its artifact.',
+      body:`<div class="quote">“I want to train a 1,000-layer image classifier on a small dataset without it overfitting. What should I try first?”<small>Goal · agent-r, project team-run-01</small></div>`},
+    {a:'p',m:'P',who:'Atlas Vector Search',t:'15:02:12',h:'Searched the hub by meaning: 7 candidates from 2 studies',p:'The project filter comes from agent-r’s token. Every hit is then re-read from the live record before the agent sees it.',
+      body:`<div class="tbl-wrap"><table><thead><tr><th>Score</th><th>Result</th><th>Label</th></tr></thead><tbody>${hits.map(([k,s])=>`<tr><td class="num"><span class="scorebar"><i style="width:${s*100}%"></i></span>${s.toFixed(2)}</td><td>${hubBtn(k)} ${esc(H[k].title)}</td><td>${kindChip(H[k])}</td></tr>`).join('')}</tbody></table></div>`},
+    {a:'b',m:'R',who:'agent-r · applicability',t:'15:02:14',h:'Checked which results apply to its conditions',p:'A result only steers the plan if it was measured under conditions close enough to the agent’s task.',
+      body:`<div class="tbl-wrap"><table><thead><tr><th>Result</th><th>Dataset</th><th>Model</th><th>Verdict</th></tr></thead><tbody>${applic.map(([k,d,m,ok,why])=>`<tr class="${ok?'':'dim'}"><td>${hubBtn(k)}</td><td>${d}</td><td>${m}</td><td>${ok?'<span class="chip c-pos">Applies</span>':'<span class="chip c-off">Not applied</span>'} <span class="muted" style="font-size:12.5px">${why}</span></td></tr>`).join('')}</tbody></table></div>`},
+    {a:'b',m:'R',who:'agent-r · plan',t:'15:02:19',h:'Planned around what is already known',p:'Every line cites the exact result it relies on.',
+      body:`<div class="cols3">
+        <div class="col"><h4 style="color:var(--neg)">Skip</h4><ul><li>Plain deep nets get worse ${hubBtn('N02')}</li><li>Training longer won’t fix it ${hubBtn('N05')}</li><li>Don’t debug vanishing gradients ${hubBtn('N04')}</li></ul></div>
+        <div class="col"><h4 style="color:var(--pos)">Build on</h4><ul><li>Residual shortcuts, option A ${hubBtn('N13')}</li><li>LR warmup for very deep nets ${hubBtn('N14')}</li><li>Reuse <span class="mono">residual_block.py</span></li></ul></div>
+        <div class="col"><h4 style="color:var(--b)">Investigate</h4><ul><li>Regularization at 1,202 layers is untested ${'<span class="refbtn" data-gap="G1">G1</span>'}</li><li>Record seeds so the run is reproducible ${'<span class="refbtn" data-gap="G5">G5</span>'}</li></ul></div></div>`},
+    {a:'p',m:'P',who:'Hub · claim',t:'15:02:20',h:'Claimed open experiment G1 so no one else duplicates it',p:'The claim carries the reproduction bundle and flags what is missing. agent-r will publish its result here whether regularization helps or not.',
+      body:`<div class="decision"><div class="jobchip"><div class="j">G1</div><small>Claimed by agent-r</small></div>
+        <dl class="dl"><dt>Experiment</dt><dd>${esc(GAPS.G1.title)}</dd><dt>Starts from</dt><dd>${hubBtn('N13')} ${hubBtn('N14')} recipe and code</dd><dt>Will record</dt><dd>Seeds, framework version, BN momentum (missing from the original)</dd><dt>Publishes</dt><dd>Test error at 1,202 layers vs the 7.93% baseline, positive or negative</dd></dl></div>`},
+  ];
+  el.innerHTML=`<div class="banner note"><div><b>Illustrative session.</b> This shows how an agent uses the hub. No ResNet model is trained in this demo. The measured agent loop, where memory changes a job that really runs, is under <b>Platform verification</b>.</div></div>
+    <div class="controls" style="padding:0 0 14px"><span></span><button class="btn" id="replaySession"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z" fill="currentColor"/></svg>Replay session</button></div>
+    ${stepsHtml(steps,animate)}`;
+  document.getElementById('replaySession').addEventListener('click',()=>renderSession(true));
+  if(animate) animateSteps(el);
+}
+
+/* ---------- shared step renderer ---------- */
+function stepsHtml(steps,animate){
+  return `<ol class="steps">${steps.map(st=>`<li class="step${animate?' pending':''}" data-actor="${st.a}"><span class="marker">${st.m}</span><div class="card">
+    <div class="step-head"><span class="actor">${st.who}</span><span class="time">${st.t}</span></div>
+    <h3>${st.h}</h3><p class="plain">${st.p}</p>${st.body}</div></li>`).join('')}</ol>`;
+}
+function animateSteps(el){
+  const lis=[...el.querySelectorAll('.step')], reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const bars=el.querySelectorAll('.step:last-child .bar i'), widths=[...bars].map(b=>b.style.width); bars.forEach(b=>b.style.width='0');
+  lis.forEach((li,i)=>setTimeout(()=>{lis.forEach(l=>l.classList.remove('active'));li.classList.remove('pending');li.classList.add('active');
+    if(i===lis.length-1) setTimeout(()=>{bars.forEach((b,j)=>b.style.width=widths[j]);li.classList.remove('active')},150);
+    if(!reduce) li.scrollIntoView({block:'nearest',behavior:'smooth'});},reduce?0:i*750));
+}
+function wireTree(tree,onOpen){
+  const items=()=>[...tree.querySelectorAll('[role=treeitem]')].filter(n=>!n.parentElement.closest('[aria-expanded=false]'));
+  const first=tree.querySelector('[role=treeitem]'); first.tabIndex=0;
+  const focus=n=>{tree.querySelectorAll('[role=treeitem]').forEach(x=>x.tabIndex=-1);n.tabIndex=0;n.focus()};
+  const open=n=>{tree.querySelectorAll('[aria-selected=true]').forEach(x=>x.setAttribute('aria-selected','false'));n.setAttribute('aria-selected','true');onOpen(n.dataset.node)};
+  tree.addEventListener('click',e=>{const n=e.target.closest('[role=treeitem]');if(!n)return;e.stopPropagation();
+    if(e.target.closest('.twist')&&n.hasAttribute('aria-expanded')) n.setAttribute('aria-expanded',n.getAttribute('aria-expanded')==='true'?'false':'true'); else open(n); focus(n)});
+  tree.addEventListener('keydown',e=>{const n=e.target.closest('[role=treeitem]');if(!n)return;const list=items(),i=list.indexOf(n);
+    if(e.key==='ArrowDown'&&list[i+1]){focus(list[i+1]);e.preventDefault()}
+    else if(e.key==='ArrowUp'&&list[i-1]){focus(list[i-1]);e.preventDefault()}
+    else if(e.key==='ArrowRight'){if(n.getAttribute('aria-expanded')==='false')n.setAttribute('aria-expanded','true');else if(list[i+1])focus(list[i+1]);e.preventDefault()}
+    else if(e.key==='ArrowLeft'){if(n.getAttribute('aria-expanded')==='true')n.setAttribute('aria-expanded','false');else{const p=n.parentElement.closest('[role=treeitem]');if(p)focus(p)}e.preventDefault()}
+    else if(e.key==='Enter'||e.key===' '){open(n);e.preventDefault()}});
+}
+
+/* ================= VERIFICATION views ================= */
+function scenario(mode){
+  const s={mode,hits:[],applic:[],decision:null};
+  if(mode==='off'){
+    s.decision={job:'plain-l1',used:[],skipped:[{job:'dict-a-l6',why:'No evidence available about any receiver dictionary.',refs:[]},{job:'dict-b-l6',why:'No evidence available about any receiver dictionary.',refs:[]}],
+      rejected:[],reason:'Memory is disabled, so there is nothing to build on. Run the dictionary-free baseline.'};
+  } else {
+    const Hs=[];
+    if(mode==='corrected'){Hs.push({r:R.promising,score:.86,status:'stale',note:'Index still holds v1. Live record is v2, so this hit is ignored.'});Hs.push({r:R.promising2,score:.79,status:'current'})}
+    else if(mode==='expired') Hs.push({r:R.promising,score:.86,status:'expired',note:'expires_at passed at 14:00:00. Hidden even though the index still returns it.'});
+    else Hs.push({r:R.promising,score:.86,status:'current'});
+    Hs.push({r:R.negative,score:.83,status:'current'},{r:R.distractor,score:.81,status:'current'},{r:R.u1,score:.47,status:'current'});
+    Hs.sort((a,b)=>b.score-a.score); s.hits=Hs;
+    s.applic=Hs.filter(h=>h.status==='current').map(h=>{const c=h.r.cond,m=[];
+      if(c.fixture!=='short-events-v1')m.push('fixture'); if(c.cohort!=='A')m.push('cohort'); if(c.codec!=='zlib-wrapped-deflate')m.push('codec'); if(c.dictionary!=='phrases-v1')m.push('dictionary');
+      return {r:h.r,mism:m,applies:!m.length}});
+    const rej=s.applic.filter(a=>!a.applies).map(a=>({r:a.r,why:a.mism.includes('fixture')?`Different benchmark (${a.r.cond.fixture}).`:`Measured on cohort ${a.r.cond.cohort}; this task is cohort A.`}));
+    const skipB={job:'dict-b-l6',why:'Dictionary B already missed the target on cohort A (760 / 928 bytes).',refs:[R.negative]};
+    if(mode==='on') s.decision={job:'dict-a-l6',used:[R.promising,R.negative],skipped:[{job:'plain-l1',why:'Applicable positive evidence exists, so the baseline is not the best use of the one trial.',refs:[]},skipB],
+      rejected:rej,reason:'Dictionary A reached 26.1% at level 1 on cohort A calibration data. Level 6 with the same dictionary is a bounded follow-up. Dictionary B is a valid negative under the same conditions.'};
+    else if(mode==='corrected') s.decision={job:'plain-l1',used:[R.negative],skipped:[{job:'dict-a-l6',why:'The only support for dictionary A was corrected (v2): it was measured on cohort B and missed there.',refs:[R.promising2]},skipB],
+      rejected:rej,reason:'No applicable positive evidence remains for cohort A. Dictionary B is a known negative. Fall back to the baseline.'};
+    else s.decision={job:'plain-l1',used:[R.negative],skipped:[{job:'dict-a-l6',why:'No current evidence supports dictionary A. The earlier result expired.',refs:[]},skipB],
+      rejected:rej,reason:'Without the expired result there is no applicable support for a dictionary. Run the baseline.'};
+  }
+  const m=MODES[mode]; s.run={job:m.job,out:m.out,ratio:m.out/IN,ms:m.job==='plain-l1'?37:41};
+  return s;
+}
+const vChips = r => (r.dir==='positive'?'<span class="chip c-pos">Met target</span>':r.dir==='negative'?'<span class="chip c-neg">Didn’t work</span>':'<span class="chip c-bad">Crashed</span>');
+function bar(x,lg){ if(x==null) return `<div class="bar${lg?' lg':''}"><s></s></div>`;
+  return `<div class="bar${lg?' lg':''}" role="img" aria-label="Ratio ${pct(x)} against 40% target"><i style="width:${Math.min(100,x*100)}%;--fill:var(${x<=THR?'--pos':'--neg'})"></i><s></s></div>`; }
+const legend = () => `<div class="bar-legend"><span>0%</span><span class="thr">target 40%</span><span>100%</span></div>`;
+const refBtn = (r,struck) => `<button class="refbtn${struck?' struck':''}" data-res="${keyOf(r)}">${refStr(r)}</button>`;
+
+function verifyHead(){
+  return `<div class="eyebrow">Platform verification · benchmark short-events-v1 · synthetic</div>
+    <h1>Does shared memory change the job an agent actually runs?</h1>
+    <p>Agent A publishes results on a small message-compression task and exits. A fresh Agent B gets the same request every time: shrink cohort A messages to 40% of their size or less, with one trial. Only what memory contains changes between runs.</p>
+    <div class="facts"><span class="fact">Budget <b>1 trial</b></span><span class="fact">Candidate jobs <b class="mono">plain-l1 · dict-a-l6 · dict-b-l6</b></span><span class="fact">Holdout <b class="num">8 messages · 928 bytes</b></span><span class="fact">Runs on <b>CPU in under 2 s</b></span></div>`;
+}
+function renderRun(animate){
+  const s=scenario(state.mode), el=document.getElementById('panel'), steps=[];
+  if(state.ident==='other'){
+    el.innerHTML=`<div class="banner warn"><div><b>Viewing as northwind-lab.</b> Team-run-01’s results are not visible to this project.</div></div>
+    <ol class="steps"><li class="step" data-actor="p"><span class="marker">P</span><div class="card"><div class="step-head"><span class="actor">Atlas Vector Search</span><span class="time">13:41:09.214</span></div>
+      <h3>Same question, different project: only northwind’s own result comes back</h3><p class="plain">The filter comes from the caller’s token, never from the request body.</p>
+      <pre class="code">{ <span class="k">$vectorSearch</span>: { index: <span class="s">"research_memory_v1"</span>, filter: { project_id: <span class="s">"northwind-lab"</span> }, exact: <span class="n">true</span>, limit: <span class="n">12</span> } }</pre></div></li>
+    <li class="step" data-actor="x"><span class="marker">!</span><div class="card"><div class="step-head"><span class="actor">Platform API</span><span class="time">13:41:09.380</span></div>
+      <h3>Direct read of team-run-01’s result is refused</h3><pre class="code">GET /v1/results/7f3a9c12?version=1          <span class="cm">→ 404 {"detail":"not_found"}</span>
+GET /v1/results/7f3a9c12/evidence?version=1 <span class="cm">→ 404 {"detail":"not_found"}</span></pre></div></li></ol>`;
+    return;
+  }
+  const pubs=[R.promising,R.negative,R.distractor];
+  steps.push({a:'a',m:'A',who:'Agent A',t:'13:38:02',h:'Agent A ran three calibration jobs and published every outcome',p:'Each result carries its conditions, measurement, evidence receipt and author. Then Agent A exits; nothing passes to B directly.',
+    body:`<div class="mini-grid">${pubs.map(r=>`<button class="mini" data-res="${keyOf(r)}"><span class="t">${esc(r.title)}</span><span class="chips">${vChips(r)}<span class="chip c-off">cohort ${r.cond.cohort}</span></span>${bar(ratio(r))}<span class="src">${r.src} adapter · <span class="mono">${refStr(r)}</span> · <span class="num">${r.out}/${IN} B</span></span></button>`).join('')}</div>`});
+  if(state.mode==='corrected') steps.push({a:'p',m:'P',who:'Maintainer · correction',t:'13:52:40',h:'A maintainer found the promising receipt belonged to cohort B',p:'Version 2 is created atomically. Version 1’s payload and evidence leave the record; the audit trail keeps who changed it and why.',
+    body:`<pre class="code">POST /v1/results/7f3a9c12/correct { <span class="k">"expected_version"</span>: <span class="n">1</span>, <span class="k">"reason"</span>: <span class="s">"Receipt was linked to the wrong cohort"</span>, … }
+<span class="cm">→ 200</span> { "result_id": "7f3a9c12", "version": 2 }</pre>`});
+  if(state.mode==='expired') steps.push({a:'p',m:'P',who:'Lifecycle',t:'14:00:00',h:'The promising result reached its expiry time',p:'Expiry is checked against the service clock on every read. Atlas TTL deletes the document later; nothing waits on it.',body:''});
+  steps.push({a:'b',m:'B',who:'Agent B · fresh session',t:'13:41:08',h:'A fresh Agent B gets the goal in different words',p:'B never saw A’s notes, so finding A’s work needs search by meaning.',
+    body:`<div class="quote">“Can we get individually transmitted cohort A telemetry well under half its original size on unseen events? Aim for 40% or less and spend one trial.”<small>Same request in every scenario</small></div>${state.mode==='off'?'<span class="chip c-off">Memory disabled for this run</span>':''}`});
+  if(state.mode!=='off'){
+    steps.push({a:'p',m:'P',who:'Atlas Vector Search',t:'13:41:09.214',h:`Searched by meaning: ${s.hits.length} hits, all inside team-run-01`,p:'The project filter is taken from B’s token.',
+      body:`<pre class="code">db.result_vectors.aggregate([{ <span class="k">$vectorSearch</span>: { index: <span class="s">"research_memory_v1"</span>, path: <span class="s">"embedding"</span>,
+    filter: { project_id: <span class="s">"team-run-01"</span> }, exact: <span class="n">true</span>, limit: <span class="n">12</span> } }, …])</pre>
+      <div class="tbl-wrap" style="margin-top:10px"><table><thead><tr><th>Score</th><th>Result</th><th>Ref</th></tr></thead><tbody>${s.hits.map(h=>`<tr><td class="num"><span class="scorebar"><i style="width:${h.score*100}%"></i></span>${h.score.toFixed(2)}</td><td>${esc(h.r.title)}</td><td>${refBtn(h.r)}</td></tr>`).join('')}</tbody></table></div>`});
+    steps.push({a:'p',m:'P',who:'Platform · authority check',t:'13:41:09.262',h:s.hits.some(h=>h.status!=='current')?'Re-read each hit from the live record and dropped one that is no longer true':'Re-read each hit from the live record before B sees it',
+      p:'Search indexes can lag. A corrected or expired result is caught even if the index still returns it.',
+      body:`<div class="tbl-wrap"><table><thead><tr><th>Hit</th><th>Index</th><th>Live record</th><th>Outcome</th></tr></thead><tbody>${s.hits.map(h=>`<tr><td>${esc(h.r.title)}</td><td class="mono">v${ver(h.r)}</td><td class="mono">${h.status==='stale'?'v2 (current)':h.status==='expired'?'expired 14:00':'v'+ver(h.r)}</td><td class="${h.status==='current'?'ok':'no'}">${h.status==='current'?'Passed to B':h.status==='stale'?'Dropped · stale':'Dropped · expired'}</td></tr>`).join('')}</tbody></table></div>${s.hits.filter(h=>h.note).map(h=>`<p class="plain" style="margin:8px 0 0">${h.note}</p>`).join('')}`});
+    steps.push({a:'b',m:'B',who:'Agent B · applicability',t:'13:41:10.031',h:`Checked conditions: ${s.applic.filter(a=>a.applies).length} apply, ${s.applic.filter(a=>!a.applies).length} ruled out`,p:'Code re-checks every reference B cites, so a mismatched result cannot justify a job.',
+      body:`<div class="tbl-wrap"><table><thead><tr><th>Result</th><th>Fixture</th><th>Cohort</th><th>Verdict</th></tr></thead><tbody>${s.applic.map(a=>{const c=a.r.cond,cell=(k,v,w)=>`<td class="${a.mism.includes(k)?'no':'ok'}">${esc(v)}${a.mism.includes(k)?` ≠ ${w}`:''}</td>`;
+        return `<tr class="${a.applies?'':'dim'}"><td>${refBtn(a.r)} ${esc(a.r.title)}</td>${cell('fixture',c.fixture,'short-events-v1')}${cell('cohort',c.cohort,'A')}<td>${a.applies?(a.r.dir==='positive'?'<span class="chip c-pos">Applies · supports</span>':'<span class="chip c-neg">Applies · warns</span>'):'<span class="chip c-bad">Ruled out</span>'}</td></tr>`}).join('')}</tbody></table></div>`});
+  }
+  const d=s.decision;
+  steps.push({a:'b',m:'B',who:'Agent B · decision',t:'13:41:11.408',h:`Chose ${d.job}${state.mode==='on'?', building on A’s result':', the safe baseline'}`,p:'One planner call with a fixed JSON schema. Code validates the allowlist, budget and every cited result.',
+    body:`<div class="decision"><div class="jobchip"><div class="j">${d.job}</div><small>${JOBS[d.job].desc}</small></div><dl class="dl">
+      <dt>Cited</dt><dd>${d.used.length?d.used.map(r=>refBtn(r)).join(' '):'<span class="muted">None</span>'}</dd>
+      <dt>Skipped</dt><dd>${d.skipped.map(k=>`<div class="skip"><span class="mono">${k.job}</span><span class="muted">${esc(k.why)}</span></div>`).join('')}</dd>
+      ${d.rejected.length?`<dt>Ruled out</dt><dd>${d.rejected.map(x=>`<div class="skip">${refBtn(x.r,true)}<span class="muted">${esc(x.why)}</span></div>`).join('')}</dd>`:''}</dl></div>
+      <p class="reason">${esc(d.reason)}</p><div style="margin-top:10px"><button class="refbtn" data-sel="decision">Open decision receipt</button></div>`});
+  const run=s.run, met=run.ratio<=THR;
+  steps.push({a:'r',m:'X',who:'Runner · executed',t:'13:41:11.481',h:`Ran ${run.job} on unseen messages: ${pct(run.ratio)}, ${met?'met the target':'missed the target'}`,p:'Cited versions are re-verified right before dispatch. Every message is decompressed and compared byte for byte.',
+    body:`${bar(run.ratio,true)}${legend()}<div class="stats"><div class="stat"><small>Input</small><b>${IN} B</b></div><div class="stat"><small>Output</small><b>${run.out} B</b></div><div class="stat"><small>Ratio</small><b style="color:var(${met?'--pos':'--neg'})">${run.ratio.toFixed(3)}</b></div><div class="stat"><small>Decoded</small><b>8 / 8</b></div><div class="stat"><small>Elapsed</small><b>${run.ms} ms</b></div></div>
+      <div style="margin-top:10px"><button class="refbtn" data-sel="run">Open run receipt</button></div>`});
+  el.innerHTML=stepsHtml(steps,animate);
+  if(animate) animateSteps(el);
+}
+function renderCmp(){
+  const el=document.getElementById('panel');
+  el.innerHTML=`<h2 class="sec">Same task, four memory states</h2><p class="sec-sub">Everything B controls is held fixed. Each row is a job that actually ran on the holdout set.</p>
+  <div class="same"><span class="fact">Same request</span><span class="fact">Same 3 candidate jobs</span><span class="fact">Same 1-trial budget</span><span class="fact">Same planner prompt</span></div>
+  <div class="cmp">${Object.entries(MODES).map(([k,m])=>{const s=scenario(k),met=s.run.ratio<=THR;return `<div class="card cmp-row" role="button" tabindex="0" data-mode="${k}" aria-current="${k===state.mode}">
+    <div><h4>${m.label}</h4><div class="muted" style="font-size:12.5px">${m.sub}</div><div class="job" style="margin-top:6px">${s.run.job}</div></div>
+    <div>${bar(s.run.ratio,true)}${legend()}<div style="font-size:12.5px;margin-top:6px" class="muted">Cited: ${s.decision.used.length?s.decision.used.map(r=>`<span class="mono">${refStr(r)}</span>`).join(', '):'none'}</div></div>
+    <div style="text-align:right"><div style="font:700 24px var(--f-display)" class="num">${pct(s.run.ratio)}</div><span class="chip ${met?'c-pos':'c-neg'}">${met?'Met target':'Missed target'}</span><div class="muted num" style="font-size:12px;margin-top:4px">${s.run.out} / ${IN} B</div></div></div>`}).join('')}</div>
+  <p class="sec-sub" style="margin-top:14px">With memory, B’s messages came out ${(686/238).toFixed(1)}× smaller than the baseline in the same single trial. Once the supporting result was corrected or expired, B stopped relying on it straight away. Byte counts are from the planning probe and will be replaced by runner receipts.</p>`;
+}
+const WHO={a:{name:'agent-a',role:'publisher',proj:'team-run-01'},b:{name:'agent-b',role:'reader',proj:'team-run-01'},m:{name:'maintainer',role:'maintainer',proj:'team-run-01'},x:{name:'agent-x',role:'reader',proj:'northwind-lab'},n:{name:'no token',role:'—',proj:'—'}};
+const ACTS={search:'Search',read:'Read result',evidence:'Read evidence',publish:'Publish',correct:'Correct',expire:'Expire',claim:'Claim experiment'};
+function access(w,a){
+  if(w==='n') return [401];
+  if(w==='x') return a==='search'?[200]:a==='publish'?[201]:[404];
+  if(['search','read','evidence'].includes(a)) return [200];
+  if(w==='b') return a==='claim'?[200]:[403];
+  if(a==='publish') return [201];
+  return [200];
+}
+function consoleText(w,a){
+  const [code]=access(w,a), who=WHO[w];
+  const req={search:'POST /v1/search  {"question":"shrink cohort A telemetry"}',read:'GET  /v1/results/7f3a9c12?version=1',evidence:'GET  /v1/results/7f3a9c12/evidence?version=1',publish:'POST /v1/results  {…publish body…}',
+    correct:'POST /v1/results/7f3a9c12/correct  {"expected_version":1,…}',expire:'POST /v1/results/7f3a9c12/expire  {"expected_version":1,…}',claim:'POST /v1/open/G1/claim  {}'}[a];
+  let body;
+  if(code===401) body='{"detail":"unauthorized"}'; else if(code===404) body='{"detail":"not_found"}'; else if(code===403) body='{"detail":"forbidden_role"}';
+  else body={search:w==='x'?'{"candidates":[{…northwind sentinel…,"score":0.99}]}':'{"candidates":[{"result":{"result_id":"7f3a9c12","version":1,…},"score":0.86}, …]}',
+    read:'{"result_id":"7f3a9c12","version":1,"author_id":"agent-a",…}',evidence:'{"result_id":"7f3a9c12","version":1,"evidence":{"kind":"job_receipt",…}}',
+    publish:'{"result_id":"<new uuid>","version":1}',correct:'{"result_id":"7f3a9c12","version":2}',expire:'{"result_id":"7f3a9c12","version":1,"expired":true}',claim:'{"open_id":"G1","claimed_by":"'+who.name+'"}'}[a];
+  return `<span class="cm"># token → ${who.name} · ${who.role} · ${who.proj}</span>\n${esc(req)}\n<span class="cm">→</span> <span class="${code<300?'k':'s'}">${code}</span> ${esc(body)}`;
+}
+function renderGov(){
+  const el=document.getElementById('panel'), g=state.gov;
+  el.innerHTML=`<div class="gov-grid"><div class="card"><h2 class="sec">Who can do what</h2><p class="sec-sub">Identity comes from the bearer token, never from the request. The same rules protect the research hub. Click a cell to see the call.</p>
+    <div class="tbl-wrap"><table class="matrix"><thead><tr><th>Identity</th>${Object.values(ACTS).map(a=>`<th>${a}</th>`).join('')}</tr></thead><tbody>
+    ${Object.entries(WHO).map(([w,who])=>`<tr><td><b style="font-weight:600">${who.name}</b><div class="muted mono" style="font-size:11px">${who.role} · ${who.proj}</div></td>${Object.keys(ACTS).map(a=>{const [c]=access(w,a);return `<td><button class="st-${String(c)[0]}" data-w="${w}" data-a="${a}" aria-pressed="${g.who===w&&g.act===a}" aria-label="${who.name} ${ACTS[a]}: ${c}">${c}</button></td>`}).join('')}</tr>`).join('')}
+    </tbody></table></div><div class="console" style="margin-top:12px" id="gcon">${consoleText(g.who,g.act)}</div></div>
+  <div class="card"><h2 class="sec">Life of one result</h2><p class="sec-sub">Result <span class="mono">7f3a9c12</span>, the one that convinced B to try dictionary A. Corrections and expiry take effect immediately, even while the index and TTL cleanup catch up.</p>
+    <ol class="life">
+      <li><span class="lt">13:38:02</span><span class="ld" style="--lc:var(--a)"></span><div><b>Published as v1</b> by agent-a<p>Vector entry staged before the record goes live.</p></div></li>
+      <li><span class="lt">13:41:11</span><span class="ld" style="--lc:var(--b)"></span><div><b>Cited by agent-b</b> to justify dict-a-l6<p>The decision receipt pins <span class="mono">7f3a9c12·v1</span>.</p></div></li>
+      <li><span class="lt">13:52:40</span><span class="ld" style="--lc:var(--neg)"></span><div><b>Corrected to v2</b> by maintainer<p>“Receipt was linked to the wrong cohort.” Audit keeps actor, time and reason.</p></div></li>
+      <li><span class="lt">13:52:41</span><span class="ld" style="--lc:var(--off)"></span><div><b>Stale index hit ignored</b><p>Search still returns v1. It doesn’t match the live record, so it is dropped.</p></div></li>
+      <li><span class="lt">Nov 15 00:00Z</span><span class="ld" style="--lc:var(--bad)"></span><div><b>expires_at</b><p>Hidden from search, reads and execution.</p></div></li>
+      <li><span class="lt">Nov 16 00:00Z</span><span class="ld" style="--lc:var(--off)"></span><div><b>purge_at</b>: Atlas TTL deletes the document<p>Asynchronous. The API is already correct before it runs.</p></div></li>
+    </ol></div></div>`;
+  el.querySelectorAll('.matrix button').forEach(b=>b.addEventListener('click',()=>{state.gov={who:b.dataset.w,act:b.dataset.a};el.querySelectorAll('.matrix button').forEach(x=>x.setAttribute('aria-pressed',x===b));document.getElementById('gcon').innerHTML=consoleText(b.dataset.w,b.dataset.a)}));
+}
+
+/* ================= Inspector ================= */
+function renderInsp(){
+  const el=document.getElementById('insp'), sel=state.sel;
+  if(state.area==='hub' && hubLocked()){el.innerHTML=`<div class="insp-head"><div class="eyebrow">Details</div><h2>Evidence unavailable</h2></div><div class="insp-body"><div class="unavail">Your token belongs to northwind-lab. Results in team-run-01 return <span class="mono">404 not_found</span>, and previously loaded details were cleared.</div></div>`;return}
+  if(sel.type==='hub'){
+    const h=H[sel.key], st=STUDIES[h.study];
+    const bundle=h.bundle||(h.study==='resnet'&&h.cond?RN_BUNDLE:null);
+    const missing=bundle?bundle.filter(b=>b[0]!=='y').length:0;
+    const usedBy=['N13','N14','N02','N05','N04'].includes(sel.key);
+    el.innerHTML=`<div class="insp-head"><div class="eyebrow">${st.short} · ${sel.key} · from ARA</div><h2>${esc(h.title)}</h2><div class="chips">${kindChip(h)}${h.caveat?`<span class="chip c-neg">${h.caveat}</span>`:''}${h.support==='inferred'?'<span class="chip c-off">inferred</span>':'<span class="chip c-p">explicit</span>'}</div></div>
+    <div class="insp-body">
+      ${h.cond?`<div class="insp-sec"><h4>Measured under</h4><dl class="kv"><dt>dataset</dt><dd>${esc(h.cond.dataset)}</dd><dt>model</dt><dd>${esc(h.cond.model)}</dd><dt>depth</dt><dd>${esc(h.cond.depth)}</dd><dt>recipe</dt><dd>${esc(h.cond.recipe)}</dd></dl></div>`:''}
+      <div class="insp-sec"><h4>${h.metric?'Result':'Summary'}</h4><p>${esc(h.metric||h.summary)}</p></div>
+      ${h.why?`<div class="insp-sec"><h4>${h.kind==='crashed'?'What this does and doesn’t tell you':'Why it matters'}</h4><p>${esc(h.why)}</p></div>`:''}
+      <div class="insp-sec"><h4>Evidence</h4><dl class="kv"><dt>source</dt><dd>${esc(h.refs)}</dd><dt>support</dt><dd>${h.support==='inferred'?'inferred from narrative':'explicit, from the paper or run log'}</dd></dl></div>
+      ${bundle?`<div class="insp-sec"><h4>Reproduction bundle · ${missing?missing+' missing':'complete'}</h4><ul class="checklist">${bundle.map(([s,a,b])=>`<li><span class="st ${s}">${s==='y'?'Included':s==='p'?'Partial':'Missing'}</span><span><b style="font-weight:600">${a}</b> <span class="muted mono" style="font-size:11.5px">${esc(b)}</span></span></li>`).join('')}</ul></div>
+      <div class="insp-sec"><h4>Verification</h4><div class="ladder"><span class="on">Reported</span><span>Reproduced</span><span>Independently verified</span></div></div>`:''}
+      ${usedBy?`<div class="insp-sec"><h4>Used by</h4><p>agent-r’s plan at 15:02:19 cites this result. <button class="refbtn" data-hubtab="session">Open session</button></p></div>`:''}
+      <div class="insp-sec"><h4>Provenance</h4><dl class="kv"><dt>artifact</dt><dd>${esc(st.src)}</dd><dt>origin</dt><dd>${esc(st.by)}</dd><dt>license</dt><dd>${st.license}</dd><dt>imported by</dt><dd>ARA adapter · agent-a</dd></dl></div>
+    </div>`;
+    return;
+  }
+  if(sel.type==='gap'){
+    const g=GAPS[sel.key], st=gapStatus(sel.key);
+    el.innerHTML=`<div class="insp-head"><div class="eyebrow">Open experiment · ${sel.key} · ${STUDIES[g.study].short}</div><h2>${esc(g.title)}</h2><div class="chips"><span class="chip c-open">${st==='open'?'Open':st==='mine'?'Claimed by you':'Claimed by '+g.by}</span></div></div>
+    <div class="insp-body"><div class="insp-sec"><h4>Why it’s open</h4><p>${esc(g.why)}</p></div>
+      <div class="insp-sec"><h4>Found in</h4><p class="mono" style="font-size:12.5px">${esc(g.from)}</p></div>
+      <div class="insp-sec"><h4>Builds on</h4><div class="chips">${g.builds.map(b=>hubBtn(b,b+' · '+H[b].title)).join('')}</div></div>
+      <div class="insp-sec"><h4>Needs</h4><p>${esc(g.need)}</p></div>
+      ${st==='open'?`<button class="btn" data-claim="${sel.key}">Claim this experiment</button>`:st==='mine'?`<p>You claimed this. Other agents see it as in progress. <button class="refbtn" data-unclaim="${sel.key}">Release</button></p>`:`<p class="muted">${g.by} is working on this. Their result will appear in the hub when published.</p>`}
+    </div>`;
+    return;
+  }
+  /* verification */
+  const s=scenario(state.mode);
+  if(sel.type==='res'){
+    const r=R[sel.key];
+    if(state.ident==='other'){el.innerHTML=`<div class="insp-head"><div class="eyebrow">Result</div><h2>Evidence unavailable</h2></div><div class="insp-body"><div class="unavail">This result belongs to a project your token cannot read. The platform returned <span class="mono">404 not_found</span>.</div></div>`;return}
+    if((state.mode==='expired'&&sel.key==='promising')||(state.mode==='corrected'&&sel.key==='promising')){
+      const stale=state.mode==='corrected';
+      el.innerHTML=`<div class="insp-head"><div class="eyebrow">Result <span class="mono">${refStr(r)}</span></div><h2>Evidence unavailable</h2></div><div class="insp-body"><div class="unavail">${stale?'Version 1 was superseded by a correction at 13:52:40. Historical receipts keep the reference, but its evidence is no longer served.':'This result expired at 14:00:00. It is hidden from search, reads and execution, even though Atlas TTL has not deleted it yet.'}</div>${stale?`<button class="refbtn" data-res="promising2">Open current version v2</button>`:''}</div>`;return}
+    const x=ratio(r);
+    el.innerHTML=`<div class="insp-head"><div class="eyebrow">Verification result · ${r.src} · <span class="mono">${refStr(r)}</span></div><h2>${esc(r.title)}</h2><div class="chips"><span class="chip c-off">Completed</span><span class="chip c-off">Valid</span>${vChips(r)}</div></div>
+    <div class="insp-body"><div class="insp-sec"><h4>Measured under</h4><dl class="kv"><dt>fixture</dt><dd>${r.cond.fixture}</dd><dt>cohort</dt><dd>${r.cond.cohort}</dd><dt>split</dt><dd>${r.cond.split}</dd><dt>codec</dt><dd>${r.cond.codec}</dd></dl></div>
+      <div class="insp-sec"><h4>Measurement</h4>${bar(x,true)}${legend()}<p class="num" style="margin-top:6px">${r.out} / ${r.in||IN} bytes = <b>${x.toFixed(4)}</b> · target ≤ 0.40</p></div>
+      <div class="insp-sec"><h4>Evidence receipt</h4><pre class="code">${hl(JSON.stringify({kind:'job_receipt',data:{run_id:r.run,input_bytes:r.in||IN,output_bytes:r.out,roundtrip_ok:true,zlib_version:'1.3.1'}},null,2))}</pre></div>
+      <div class="insp-sec"><h4>Source and lifecycle</h4><dl class="kv"><dt>author</dt><dd>${r.agent}</dd><dt>artifact</dt><dd>${r.artifact}</dd><dt>expires_at</dt><dd>${r.expires}</dd></dl></div>
+      ${r.v===2?`<div class="insp-sec"><h4>Audit</h4><ul class="audit"><li><span class="when">13:52:40</span><span>v1 → v2 by <b>maintainer</b>: “Receipt was linked to the wrong cohort”</span></li></ul></div>`:''}</div>`;
+    return;
+  }
+  if(sel.type==='run'){
+    const run=s.run,met=run.ratio<=THR,j=JOBS[run.job];
+    el.innerHTML=`<div class="insp-head"><div class="eyebrow">Run receipt · ${MODES[state.mode].label}</div><h2>${run.job} on cohort A holdout</h2><div class="chips"><span class="chip ${met?'c-pos':'c-neg'}">${met?'Met target':'Missed target'}</span></div></div>
+    <div class="insp-body"><div class="insp-sec">${bar(run.ratio,true)}${legend()}</div><div class="insp-sec"><h4>Receipt</h4><pre class="code">${hl(JSON.stringify({run_id:'hold-'+state.mode,configuration:{job_id:run.job,level:j.level,dictionary_family:j.dictionary_family},metric:{name:'wire_ratio',value:+run.ratio.toFixed(4),operator:'<=',threshold:0.4},execution:'completed',validity:'valid',input_bytes:IN,output_bytes:run.out,roundtrip_ok:true,elapsed_ms:run.ms},null,2))}</pre></div></div>`;
+    return;
+  }
+  const d=s.decision;
+  const receipt={mode:state.mode,job_id:d.job,used_refs:d.used.map(r=>({result_id:r.id,version:ver(r)})),skipped_jobs:d.skipped.map(k=>({job_id:k.job,reason:k.why})),rejected_candidates:d.rejected.map(x=>({result_id:x.r.id,version:ver(x.r),reason:x.why})),reason:d.reason};
+  el.innerHTML=`<div class="insp-head"><div class="eyebrow">Decision receipt · ${MODES[state.mode].label}</div><h2>Agent B chose ${d.job}</h2><div class="chips"><span class="chip c-b">${d.used.length} cited</span><span class="chip c-off">${d.skipped.length} skipped</span>${d.rejected.length?`<span class="chip c-bad">${d.rejected.length} ruled out</span>`:''}</div></div>
+    <div class="insp-body"><div class="insp-sec"><h4>Why</h4><p>${esc(d.reason)}</p></div><div class="insp-sec"><h4>Receipt JSON</h4><pre class="code">${hl(JSON.stringify(receipt,null,2))}</pre></div></div>`;
+}
+
+/* ================= wiring ================= */
+const HUB_TABS={explore:'Explore results',tree:'Research tree',open:'Open experiments',session:'Agent session'};
+const VER_TABS={run:'Agent run',cmp:'Compare runs',gov:'Access & lifecycle'};
+function renderTabs(){
+  const tabs=state.area==='hub'?HUB_TABS:VER_TABS, cur=state.area==='hub'?state.hubTab:state.verTab;
+  const openCount=Object.keys(GAPS).filter(g=>gapStatus(g)==='open').length;
+  document.getElementById('tabs').innerHTML=Object.entries(tabs).map(([k,l])=>`<button role="tab" id="t-${k}" aria-controls="panel" aria-selected="${k===cur}" tabindex="${k===cur?0:-1}" data-tab="${k}">${l}${k==='open'?`<span class="count">${openCount}</span>`:''}</button>`).join('');
+  document.getElementById('panel').setAttribute('aria-labelledby','t-'+cur);
+}
+function renderPanel(animate){
+  if(state.area==='hub'){({explore:renderExplore,tree:renderHubTree,open:renderGaps,session:renderSession})[state.hubTab](animate)}
+  else ({run:renderRun,cmp:renderCmp,gov:renderGov})[state.verTab](animate);
+}
+function renderAll(animate){
+  const hub=state.area==='hub';
+  document.querySelectorAll('.areas button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.area===state.area));
+  document.getElementById('verifyBand').hidden=hub;
+  document.getElementById('controls').hidden=hub||state.verTab==='gov';
+  document.getElementById('pagehead').innerHTML=hub?hubHead():verifyHead();
+  renderTabs(); renderPanel(animate); renderInsp();
+}
+function setArea(a){state.area=a;state.sel=a==='hub'?{type:'hub',key:'N13'}:{type:'decision'};renderAll(false)}
+function setTab(t){if(state.area==='hub')state.hubTab=t;else state.verTab=t;
+  if(t==='open'&&state.sel.type!=='gap')state.sel={type:'gap',key:'G1'};
+  document.getElementById('controls').hidden=state.area==='hub'||state.verTab==='gov';renderTabs();renderPanel(t==='session');renderInsp()}
+function setMode(m){state.mode=m;state.sel={type:'decision'};document.querySelectorAll('#modes button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.mode===m));renderPanel(state.verTab==='run');renderInsp()}
+
+document.getElementById('modes').innerHTML=Object.entries(MODES).map(([k,m])=>`<button data-mode="${k}" aria-pressed="${k===state.mode}">${m.label}</button>`).join('');
+document.getElementById('modes').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setMode(b.dataset.mode)});
+document.getElementById('replay').addEventListener('click',()=>{state.verTab='run';renderTabs();renderRun(true)});
+document.querySelector('.areas').addEventListener('click',e=>{const b=e.target.closest('[data-area]');if(b)setArea(b.dataset.area)});
+document.getElementById('ident').addEventListener('change',e=>{state.ident=e.target.value;renderAll(false)});
+document.getElementById('tabs').addEventListener('click',e=>{const b=e.target.closest('[role=tab]');if(b)setTab(b.dataset.tab)});
+document.getElementById('tabs').addEventListener('keydown',e=>{const tabs=[...document.querySelectorAll('#tabs [role=tab]')],i=tabs.findIndex(t=>t.getAttribute('aria-selected')==='true');
+  if(e.key==='ArrowRight'||e.key==='ArrowLeft'){const n=tabs[(i+(e.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length];setTab(n.dataset.tab);document.getElementById(n.id).focus();e.preventDefault()}});
+const showInsp=()=>{if(innerWidth<1040)document.getElementById('insp').scrollIntoView({behavior:'smooth'})};
+document.addEventListener('click',e=>{
+  const c=e.target.closest('[data-claim]'); if(c){e.stopPropagation();state.claims[c.dataset.claim]='agent-b';state.sel={type:'gap',key:c.dataset.claim};renderTabs();if(state.hubTab==='open')renderGaps();renderInsp();return}
+  const u=e.target.closest('[data-unclaim]'); if(u){e.stopPropagation();delete state.claims[u.dataset.unclaim];renderTabs();if(state.hubTab==='open')renderGaps();renderInsp();return}
+  const ht=e.target.closest('[data-hubtab]'); if(ht){setTab(ht.dataset.hubtab);return}
+  const h=e.target.closest('[data-hub]'); if(h){state.sel={type:'hub',key:h.dataset.hub};if(state.hubTab==='explore')document.querySelectorAll('.rcard').forEach(x=>x.setAttribute('aria-current',x.dataset.hub===h.dataset.hub));renderInsp();showInsp();return}
+  const g=e.target.closest('[data-gap]'); if(g){state.sel={type:'gap',key:g.dataset.gap};renderInsp();showInsp();return}
+  const r=e.target.closest('[data-res]'); if(r){state.sel={type:'res',key:r.dataset.res};renderInsp();showInsp();return}
+  const s=e.target.closest('[data-sel]'); if(s){state.sel={type:s.dataset.sel};renderInsp();showInsp();return}
+  const m=e.target.closest('.cmp-row'); if(m){setMode(m.dataset.mode)}
+});
+document.addEventListener('keydown',e=>{if(e.key!=='Enter'&&e.key!==' ')return;const g=e.target.closest&&e.target.closest('.gap[data-gap],.cmp-row');if(g&&e.target===g){e.preventDefault();g.click()}});
+const hash=location.hash.slice(1);
+if(hash==='verify') state.area='verify'; else if(HUB_TABS[hash]) state.hubTab=hash;
+renderAll(false);
+</script>
