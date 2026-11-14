@@ -3,7 +3,7 @@ import operator
 import re
 from typing import Annotated, Literal
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, JsonValue, StringConstraints, field_validator, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, JsonValue, RootModel, StringConstraints, field_validator, model_validator
 
 from platform_api.config import utcnow
 
@@ -11,18 +11,30 @@ Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max
 Tag = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
 ResultID = Annotated[str, StringConstraints(pattern=r"^[0-9a-f-]{36}$")]
 Scalar = str | int | float | bool | None
+JobID = Annotated[str, StringConstraints(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$")]
+
+
+def flat_fields(mapping):
+    if len(mapping) > 32 or any(not re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_-]{0,79}", key)
+                                for key in mapping):
+        raise ValueError("invalid field names")
+    if any(type(value) is float and not math.isfinite(value) for value in mapping.values()):
+        raise ValueError("invalid numeric condition")
+    return mapping
 
 
 class Body(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
 
-class Conditions(Body):
-    fixture_revision: Tag
-    cohort: Tag
-    codec: Tag
-    dictionary_revision: Tag
-    split: Tag | None = None
+class Conditions(RootModel[dict[str, Scalar]]):
+    @field_validator("root")
+    @classmethod
+    def validate_conditions(cls, values):
+        flat_fields(values)
+        if not isinstance(values.get("fixture_revision"), str) or not values["fixture_revision"].strip():
+            raise ValueError("missing fixture revision")
+        return values
 
 
 class Ref(Body):
@@ -86,20 +98,21 @@ class Publish(Body):
     def measured_direction(self):
         if self.expires_at <= utcnow():
             raise ValueError("new results must expire in the future")
-        for mapping in (self.conditions, self.configuration):
-            if len(mapping) > 32 or any(not re.fullmatch(r"[a-zA-Z_][\w-]{0,79}", k) for k in mapping):
-                raise ValueError("invalid fields")
-        if any(not isinstance(self.conditions.get(k), str) or not self.conditions[k].strip()
-               for k in ["cohort", "codec", "dictionary_revision"]):
-            raise ValueError("missing conditions")
+        flat_fields(self.conditions)
+        flat_fields(self.configuration)
         data = self.evidence.data
         if self.execution == "completed":
             reproduce = data.get("reproduce")
             if not isinstance(reproduce, dict) or not all(
-                isinstance(reproduce.get(k), str) and reproduce[k] for k in
-                ("command", "fixture_sha256", "zlib_version", "python_version")
-            ) or "dictionary_sha256" not in reproduce:
-                raise ValueError("missing reproduction metadata")
+                isinstance(reproduce.get(k), str) and reproduce[k] for k in ("command", "fixture_sha256")
+            ):
+                raise ValueError("missing reproduction command or fixture hash")
+            versions = reproduce.get("versions")
+            if versions is None:
+                versions = {k: v for k, v in reproduce.items() if k.endswith("_version")}
+            if not isinstance(versions, dict) or not versions or any(
+                    not isinstance(v, str) or not v.strip() for v in versions.values()):
+                raise ValueError("missing runtime or library versions")
         if self.execution == "completed" and self.validity == "valid":
             if self.metric.value is None or not data.get("run_id"):
                 raise ValueError("missing valid measurement")
@@ -138,7 +151,7 @@ class Mismatch(Body):
 
 class Applicability(Body):
     status: Literal["applies", "mismatch"]
-    mismatches: list[Mismatch] = Field(max_length=4)
+    mismatches: list[Mismatch] = Field(max_length=32)
 
 
 class Candidate(Body):
@@ -148,7 +161,7 @@ class Candidate(Body):
 
 
 class Skip(Body):
-    job_id: Literal["plain-l1", "dict-a-l6", "dict-b-l6"]
+    job_id: JobID
     reason: Text
     refs: list[Ref] = Field(max_length=8)
 
@@ -159,9 +172,9 @@ class Rejected(Body):
 
 
 class Plan(Body):
-    job_id: Literal["plain-l1", "dict-a-l6", "dict-b-l6"]
+    job_id: JobID
     used_refs: list[Ref] = Field(max_length=8)
-    skipped_jobs: list[Skip] = Field(max_length=3)
+    skipped_jobs: list[Skip] = Field(max_length=32)
     rejected_candidates: list[Rejected] = Field(max_length=8)
     reason: Text
 

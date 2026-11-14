@@ -14,14 +14,12 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pymongo.errors import PyMongoError
 
-from benchmark.agent import planner_name, ref
-from benchmark.publish import replacement
-from benchmark.run import TASK, QUESTION, zlib
 from demo.common import client, run_agent
 from platform_api.activity import Events
 from platform_api.app import frame
 from platform_api.config import identities, utcnow
 from platform_api.models import Approve, Body, Expire, Reject, ResultID
+from platform_api.profile import experiment, presentation
 from platform_api.store import Store
 from typing import Literal
 
@@ -120,6 +118,8 @@ async def relay(app, token_name, source):
 @asynccontextmanager
 async def lifespan(app):
     state = app.state
+    state.experiment = experiment()
+    state.profile = presentation(state.experiment)
     configured = identities()
     who = {role: configured[os.environ[f"MEMORY_{role.upper()}_TOKEN"]]
            for role in ("publisher", "reader", "maintainer", "other")}
@@ -201,8 +201,8 @@ def state():
             "evidence_candidates": state.proposal_snapshot, "producer": state.producer,
             "receipts": [d["receipt"] for d in reversed(decisions) if d.get("receipt")],
             "stream": dict(state.modes),
-            "environment": {"planner": planner_name(), "embedding": health.get("embedding_model"),
-                            "zlib_version": zlib.ZLIB_RUNTIME_VERSION}}
+            "environment": {**state.profile.environment(), "experiment_id": state.experiment.id,
+                            "embedding": health.get("embedding_model")}}
 
 
 @app.get("/demo/events")
@@ -236,9 +236,11 @@ def producer():
     with state.action:
         if state.producer:
             return state.producer
-        state.producer = run_agent("benchmark.publish", "MEMORY_PUBLISHER_TOKEN")
+        state.producer = run_agent(state.profile.producer_module, "MEMORY_PUBLISHER_TOKEN")
         refs = state.producer["refs"]
-        state.awaiting_index = [refs[k] for k in ("promising", "negative", "distractor")]
+        labels = state.producer.get("index_labels", refs)
+        state.awaiting_index = [refs[label] for label in labels
+                               if searchable(state.producer["receipts"][label])]
         state.stage = "published"
         return state.producer
 
@@ -247,20 +249,30 @@ class Memory(Body):
     memory: Literal["on", "off"]
 
 
+def searchable(measurement):
+    return measurement["execution"] == "completed" and measurement["validity"] == "valid"
+
+
+def search_body():
+    profile = app.state.profile
+    return {"question": profile.question, "conditions": profile.conditions}
+
+
 def propose(memory):
     state = app.state
     if memory == "on" and state.awaiting_index:
         until = monotonic() + 20
         while state.awaiting_index:
-            rows = forward("reader", "POST", "/v1/search", {"question": QUESTION, "conditions": TASK})
-            current = [ref(item) for item in rows["candidates"]]
+            rows = forward("reader", "POST", "/v1/search", search_body())
+            current = [{k: item["result"][k] for k in ("result_id", "version")}
+                       for item in rows["candidates"]]
             state.awaiting_index = [r for r in state.awaiting_index if r not in current]
             if not state.awaiting_index:
                 break
             if monotonic() >= until:
                 raise HTTPException(503, "search_index_catching_up")
             sleep(0.35)
-    result = run_agent("benchmark.agent", "MEMORY_READER_TOKEN", "--memory", memory)
+    result = run_agent(state.profile.agent_module, "MEMORY_READER_TOKEN", "--memory", memory)
     state.memory = memory
     state.latest = result["decision_id"]
     state.proposal_snapshot = result["evidence_candidates"]
@@ -313,10 +325,12 @@ class Governance(Expire):
 @app.post("/demo/governance/correct")
 def correct(body: Governance):
     with app.state.action:
+        replacement = app.state.profile.replacement()
         result = forward("maintainer", "POST", f"/v1/results/{body.result_id}/correct",
-                         {**body.model_dump(exclude={"result_id"}), "replacement": replacement()})
+                         {**body.model_dump(exclude={"result_id"}), "replacement": replacement})
         app.state.awaiting_index = [r for r in app.state.awaiting_index if r["result_id"] != body.result_id]
-        app.state.awaiting_index.append(result)
+        if searchable(replacement):
+            app.state.awaiting_index.append(result)
         app.state.stage = "corrected"
         return result
 
@@ -344,14 +358,12 @@ def evidence(result_id: ResultID, version: int | None = None):
 
 @app.post("/demo/isolation-check")
 def isolation():
-    state = app.state
     items = forward("reader", "GET", "/v1/results")["items"]
-    target = state.producer["refs"]["promising"]["result_id"] if state.producer else (
-        items[0]["result_id"] if items else None)
+    target = items[0]["result_id"] if items else None
     if not target:
         raise HTTPException(409, "publish_findings_first")
     with client("other") as other:
-        search = safe_api(other.post("/v1/search", json={"question": QUESTION, "conditions": TASK}))
+        search = safe_api(other.post("/v1/search", json=search_body()))
         direct = other.get(f"/v1/results/{target}")
         evidence = other.get(f"/v1/results/{target}/evidence")
     return {"search": search, "direct_status": direct.status_code, "evidence_status": evidence.status_code,

@@ -9,8 +9,8 @@ from benchmark.client import connect
 
 def run_agent(module, token_env, *args):
     allowed = {"PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "USERPROFILE", "LOCALAPPDATA",
-               "APPDATA", "MEMORY_API_URL", "MEMORY_PLANNER", "SSL_CERT_FILE"}
-    if module == "benchmark.agent":
+               "APPDATA", "MEMORY_API_URL", "MEMORY_PLANNER", "MEMORY_EXPERIMENT_MODULE", "SSL_CERT_FILE"}
+    if token_env == "MEMORY_READER_TOKEN":
         allowed.add("OPENAI_API_KEY")
     child = {k: v for k, v in os.environ.items() if k.upper() in allowed}
     child.update(MEMORY_TOKEN=os.environ[token_env], PYTHONUTF8="1", PYTHONUNBUFFERED="1")

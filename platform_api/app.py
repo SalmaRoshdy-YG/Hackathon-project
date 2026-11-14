@@ -17,16 +17,18 @@ from platform_api.config import identities
 from platform_api.decisions import Decisions, outward
 from platform_api.embedding import model
 from platform_api.models import Approve, Correct, Expire, Proposal, Publish, Reject, Resolve, ResultID, Search
+from platform_api.profile import experiment
 from platform_api.store import Store, error, public
 
 
 @asynccontextmanager
 async def lifespan(app):
     app.state.identities = identities()
+    app.state.experiment = experiment()
     bus = Events()
     store = Store(os.environ["MEMORY_ATLAS_URI"], os.environ["MEMORY_ATLAS_DB"], bus)
     app.state.store = store
-    app.state.decisions = Decisions(store)
+    app.state.decisions = Decisions(store, app.state.experiment)
     app.state.bus = bus
     try:
         yield
@@ -94,8 +96,11 @@ def results(request: Request, who=Principal):
 
 @app.post("/v1/search")
 def search(request: Request, body: Search, who=Principal):
+    experiment = request.app.state.experiment
+    if body.conditions is not None and experiment.missing_conditions(body.conditions):
+        error(422, "missing_match_conditions")
     try:
-        return {"candidates": request.app.state.store.search(who, body)}
+        return {"candidates": request.app.state.store.search(who, body, experiment.match_fields)}
     except (PyMongoError, httpx.HTTPError, KeyError, ValueError):
         error(503, "search_unavailable")
 

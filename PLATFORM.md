@@ -108,6 +108,10 @@ db.result_vectors.aggregate([
 - `decisions` holds one document per decision. Approve, reject, dispatch and receipt are conditional updates on `status`, so a decision can't be approved twice or executed without approval.
 - Expiry hides the record from every agent path immediately. TTL on each collection's BSON Date `purge_at` with `expireAfterSeconds: 0` is asynchronous cleanup: heads and vectors get `expires_at + 24h`, history entries get the head's purge date. Best-effort deletion of a retired vector after correction or expiry can shorten retention. The API stays correct if deletion or TTL lags. [Atlas TTL](https://www.mongodb.com/docs/manual/core/index-ttl/)
 
+## Experiment profiles
+
+The API and presenter load the same trusted Python profile using `MEMORY_EXPERIMENT_MODULE`. Job IDs, baseline, task validation, match fields, evidence support, and the runner come from the profile. The selected profile ID is persisted in decisions and checked again before dispatch. The example pipeline and workflow below describe the default compression profile. See [BACKEND.md](BACKEND.md#switch-experiments) for the adapter contract and the verified lookup example.
+
 ## Benchmark and agent decision
 
 Use `short-events-v1`, a synthetic independent-event compression fixture. Each message is compressed on its own, as if sent one at a time. A pre-shared dictionary models a receiver that already knows the deployment's event vocabulary. Count all zlib stream bytes, including headers and the dictionary ID. Dictionary distribution is a fixed setup cost outside the per-message metric and should be disclosed in the demo. No model is trained anywhere.

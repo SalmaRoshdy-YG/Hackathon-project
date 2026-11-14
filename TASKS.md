@@ -80,3 +80,6 @@ Backend branch: `backend/precedent-mongo`. See [BACKEND.md](BACKEND.md) for the 
 | P3 Runner | `python -m unittest discover -s tests -v` verified the calibration and holdout matrix, round trips, crash semantics and receipt metadata. |
 | P3/P4 Rehearsal | `python -m demo.rehearse --out receipts/rehearsal` and two more fresh projects yielded 686 / 238 / 686 / 686 bytes, with exact citations, changed skip reasons and no receipt for rejection. Concurrent approval and dispatch admitted one winner each. |
 | Pending | Frontend owner connects their build to the presenter and verifies the guided interface. The working backend uses BGE plus the rules planner; live checks of the optional OpenAI mode need a team API key. |
+
+
+The platform and presenter also passed an alternate experiment end to end with `python -m tests.check_lookup_profile`. The same API approved and measured 122 / 7 / 122 / 122 comparisons with its own job catalog, condition fields, reproduction data, and correction. Atlas preflight and the default presenter rehearsal passed after the profile refactor.

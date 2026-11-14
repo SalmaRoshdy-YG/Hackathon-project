@@ -5,7 +5,8 @@ from fastapi import HTTPException
 from pymongo import ReturnDocument
 from pymongo.errors import PyMongoError
 
-from benchmark.run import CATALOG, FIXTURE, TASK, measure
+from platform_api.models import Proposal
+from platform_api.profile import LEGACY_PROFILE_ID
 from platform_api.config import utcnow
 from platform_api.store import error
 
@@ -24,7 +25,8 @@ def citations(plan):
 
 
 class Decisions:
-    def __init__(self, store):
+    def __init__(self, store, experiment):
+        self.experiment = experiment
         self.store = store
         self.collection = store.db.decisions
 
@@ -42,6 +44,10 @@ class Decisions:
         return [outward(doc) for doc in self.collection.find(q).sort("created_at", -1).limit(40)]
 
     def propose(self, identity, body):
+        experiment = self.experiment
+        if (body.job_id not in experiment.catalog
+                or any(skip.job_id not in experiment.catalog for skip in body.skipped_jobs)):
+            error(422, "unknown_experiment_job")
         refs = citations(body)
         seen = {key(c.ref) for c in body.candidates}
         if (len(seen) != len(body.candidates) or len({key(r) for r in body.used_refs}) != len(body.used_refs)
@@ -49,16 +55,16 @@ class Decisions:
                 or body.job_id in {s.job_id for s in body.skipped_jobs}
                 or any(key(r.ref) not in seen for r in body.rejected_candidates)
                 or any(key(r) not in seen for r in refs)
-                or (body.memory == "off" and (refs or seen or body.job_id != "plain-l1"))
-                or (body.job_id != "plain-l1" and not body.used_refs)):
+                or (body.memory == "off" and (refs or seen or body.job_id != experiment.baseline))
+                or (body.job_id != experiment.baseline and not body.used_refs)):
             error(422, "invalid_decision_evidence")
         c = body.conditions
-        if (c.fixture_revision != FIXTURE or c.codec != TASK["codec"] or c.cohort not in ("A", "B")
-                or c.dictionary_revision != TASK["dictionary_revision"] or c.split != "holdout"):
+        if experiment.missing_conditions(c) or not experiment.validate_task(c.root):
             error(422, "unsupported_task_conditions")
         try:
             # Recompute applicability in MongoDB, including candidates that will only be shown in the trace.
-            candidate_docs = self.store.candidates_for(identity, [row.ref for row in body.candidates], c)
+            candidate_docs = self.store.candidates_for(identity, [row.ref for row in body.candidates], c,
+                                                       experiment.match_fields)
         except HTTPException as exc:
             if exc.status_code == 404:
                 error(422, "invalid_decision_evidence")
@@ -66,10 +72,9 @@ class Decisions:
         by_ref = {key(candidate.ref): doc for candidate, doc in zip(body.candidates, candidate_docs)}
         if any(by_ref[key(ref)]["applicability"]["status"] != "applies" for ref in refs):
             error(422, "invalid_decision_evidence")
-        if body.job_id != "plain-l1":
-            selected_family = body.job_id.split("-")[1].upper()
+        if body.job_id != experiment.baseline:
             if not any(by_ref[key(ref)]["direction"] == "positive" and
-                       by_ref[key(ref)]["configuration"].get("dictionary_family") == selected_family
+                       experiment.supports(body.job_id, by_ref[key(ref)])
                        for ref in body.used_refs):
                 error(422, "selected_job_lacks_support")
         for candidate, doc in zip(body.candidates, candidate_docs):
@@ -78,7 +83,7 @@ class Decisions:
         now = utcnow()
         record = {**body.model_dump(), "_id": str(uuid4()), "project_id": identity.project_id,
                   "proposed_by": identity.agent_id, "status": "pending", "created_at": now,
-                  "updated_at": now, "catalog": list(CATALOG), "budget": 1}
+                  "updated_at": now, "catalog": list(experiment.catalog), "budget": 1, "experiment_id": experiment.id}
         self.collection.insert_one(record)
         return outward(record)
 
@@ -104,7 +109,14 @@ class Decisions:
         return doc
 
     def dispatch(self, identity, decision_id):
-        self.can_dispatch(identity, decision_id)
+        existing = self.can_dispatch(identity, decision_id)
+        experiment = self.experiment
+        if (existing.get("experiment_id", LEGACY_PROFILE_ID) != experiment.id
+                or existing["catalog"] != list(experiment.catalog)):
+            error(409, "decision_experiment_changed")
+        plan = Proposal.model_validate({field: existing[field] for field in Proposal.model_fields})
+        if experiment.missing_conditions(plan.conditions) or not experiment.validate_task(plan.conditions.root):
+            error(409, "decision_experiment_changed")
         claim = str(uuid4())
         query = self.lookup(identity, decision_id)
         claimed = self.collection.find_one_and_update({**query, "status": "approved"},
@@ -113,11 +125,9 @@ class Decisions:
         if not claimed:
             error(409, "decision_not_approved")
 
-        from platform_api.models import Proposal
-        plan = Proposal.model_validate({field: claimed[field] for field in Proposal.model_fields})
         try:
             # No intervening caller round trip between the authoritative read and job dispatch.
-            self.store.resolve(identity, citations(plan), plan.conditions)
+            self.store.resolve(identity, citations(plan), plan.conditions, experiment.match_fields)
         except HTTPException as exc:
             if exc.status_code != 404:
                 raise
@@ -127,11 +137,12 @@ class Decisions:
             raise
 
         try:
-            measured = measure(plan.job_id, plan.conditions.cohort, plan.conditions.split)
+            measured = experiment.measure(plan.job_id, plan.conditions.root)
         except Exception:
             return self.finish(query, claim, "aborted", {"abort_reason": "runner_failed"})
         receipt = {**measured, "decision_id": decision_id, "request": plan.request,
                    "memory": plan.memory, "model": plan.model, "catalog": claimed["catalog"],
+                   "experiment_id": experiment.id,
                    "budget": claimed["budget"], "used_refs": claimed["used_refs"],
                    "skipped_jobs": claimed["skipped_jobs"], "candidates": claimed["candidates"],
                    "rejected_candidates": claimed["rejected_candidates"], "reason": plan.reason,

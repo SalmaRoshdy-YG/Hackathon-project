@@ -14,7 +14,6 @@ from platform_api.embedding import DIMENSIONS, embed, index_name, model
 KEEP = timedelta(days=1)
 PUBLIC = ("schema_version", "hypothesis", "fixture_revision", "conditions", "configuration", "metric",
           "execution", "validity", "direction", "source", "expires_at", "author_id", "version")
-MATCH_FIELDS = ("fixture_revision", "cohort", "codec", "dictionary_revision")
 
 
 def error(code, detail):
@@ -34,25 +33,34 @@ def public(doc):
             "status": doc.get("status", "current")}
 
 
-def live_filter(project, result_id, version=None, *, usable=False, conditions=None):
+def conditions_pairs(conditions, match_fields, prefix="$"):
+    for field in match_fields:
+        path = field if field == "fixture_revision" else "conditions."+field
+        yield field, conditions.root[field], prefix+path
+
+
+def live_filter(project, result_id, version=None, *, usable=False, conditions=None, match_fields=()):
     query = {"_id": result_id, "project_id": project, "$expr": active()}
     if version is not None:
         query["version"] = version
     if usable:
         query.update(execution="completed", validity="valid")
     if conditions is not None:
-        query.update({k if k == "fixture_revision" else "conditions."+k: getattr(conditions, k)
-                      for k in MATCH_FIELDS})
+        query["$expr"] = {"$and": [active(), *(
+            {"$and": [{"$ne": [{"$type": path}, "missing"]}, {"$eq": [path, literal(value)]}]}
+            for _, value, path in conditions_pairs(conditions, match_fields))]}
     return query
 
 
-def applicability_stages(conditions, prefix="$"):
-    fields = [{"field": name, "wanted": literal(getattr(conditions, name)),
-               "found": prefix + (name if name == "fixture_revision" else "conditions."+name)}
-              for name in MATCH_FIELDS]
-    return [{"$set": {"mismatches": {"$filter": {
-        "input": fields, "as": "entry", "cond": {"$ne": ["$$entry.wanted", "$$entry.found"]}}}}},
-        {"$set": {"applicability": {"status": {"$cond": [
+def applicability_stages(conditions, match_fields, prefix="$"):
+    fields = [{"field": name, "wanted": literal(wanted), "found": {"$ifNull": [path, None]},
+               "missing": {"$eq": [{"$type": path}, "missing"]}}
+              for name, wanted, path in conditions_pairs(conditions, match_fields, prefix)]
+    return [{"$set": {"mismatches": {"$map": {
+        "input": {"$filter": {"input": fields, "as": "entry", "cond": {"$or": [
+            "$$entry.missing", {"$ne": ["$$entry.wanted", "$$entry.found"]}]}}},
+        "as": "entry", "in": {"field": "$$entry.field", "wanted": "$$entry.wanted", "found": "$$entry.found"},
+        }}}}, {"$set": {"applicability": {"status": {"$cond": [
             {"$eq": [{"$size": "$mismatches"}, 0]}, "applies", "mismatch"]}, "mismatches": "$mismatches"}}}]
 
 
@@ -204,7 +212,7 @@ class Store:
             error(409, "result_changed_or_expired")
         return {"result_id": result_id, "version": body.expected_version, "expired": True}
 
-    def search_pipeline(self, project, vector, conditions):
+    def search_pipeline(self, project, vector, conditions, match_fields=()):
         joins = [{"$eq": ["$_id", "$$id"]}, {"$eq": ["$project_id", literal(project)]},
                  {"$eq": ["$version", "$$version"]}, {"$eq": ["$search_key", "$$key"]}, active(),
                  {"$eq": ["$execution", "completed"]}, {"$eq": ["$validity", "valid"]}]
@@ -221,22 +229,22 @@ class Store:
         if conditions is None:
             pipeline.append({"$set": {"applicability": literal(None)}})
         else:
-            pipeline += applicability_stages(conditions, "$head.")
+            pipeline += applicability_stages(conditions, match_fields, "$head.")
         return pipeline + [{"$limit": 8}, {"$project": {"_id": 0, "head": 1, "score": 1, "applicability": 1}}]
 
-    def search(self, identity, body):
+    def search(self, identity, body, match_fields):
         vector = embed(body.question, query=True)
-        pipeline = self.search_pipeline(identity.project_id, vector, body.conditions)
+        pipeline = self.search_pipeline(identity.project_id, vector, body.conditions, match_fields)
         return [{"result": public(d["head"]), "score": d["score"], "applicability": d["applicability"]}
                 for d in self.db.result_vectors.aggregate(pipeline)]
 
-    def candidates_for(self, identity, refs, conditions):
+    def candidates_for(self, identity, refs, conditions, match_fields):
         if not refs:
             return []
         branches = [live_filter(identity.project_id, ref.result_id, ref.version, usable=True)
                     for ref in refs]
         cursor = self.db.results.aggregate([{"$match": {"$or": branches}},
-            {"$project": {"evidence": 0, "events": 0}}, *applicability_stages(conditions)])
+            {"$project": {"evidence": 0, "events": 0}}, *applicability_stages(conditions, match_fields)])
         return self.order(cursor, refs)
 
     @staticmethod
@@ -246,11 +254,11 @@ class Store:
             error(404, "unusable_reference")
         return [docs[ref.result_id, ref.version] for ref in refs]
 
-    def resolve(self, identity, refs, conditions=None):
+    def resolve(self, identity, refs, conditions=None, match_fields=()):
         if not refs:
             return []
         # Use one database read and one time base for every cited version.
         branches = [live_filter(identity.project_id, ref.result_id, ref.version, usable=True,
-                                conditions=conditions) for ref in refs]
+                                conditions=conditions, match_fields=match_fields) for ref in refs]
         cursor = self.db.results.find({"$or": branches}, {"evidence": 0})
         return [public(doc) for doc in self.order(cursor, refs)]
