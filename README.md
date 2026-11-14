@@ -8,6 +8,8 @@ Researchers open a research question, follow the experiments that tested it, and
 
 ## Start here
 
+Reviewing the project? Use the [human review guide](HUMANS.md) to find the relevant files, checks, and evidence.
+
 Put these Markdown files at the root of the team’s hackathon repository so each teammate and their assistant can use the same instructions. Open that checkout, claim a task on the [team board](TASKS.md), substitute your task ID, and paste this into your assistant.
 
 > Read AGENTS.md, PLATFORM.md, and TASKS.md. I own TASK_ID. Implement its acceptance check through the real platform interface, verify the result, and add a handoff to TASKS.md with the command and observed outcome. Coordinate shared interface changes with the affected owners.
