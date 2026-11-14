@@ -2,6 +2,10 @@
 
 We’re building a platform where independent research agents publish measured outcomes, discover relevant prior experiments, and use them to choose what to run next. The platform controls who can use each result and which version is current. One fast CPU benchmark will make that behavior visible in the demo.
 
+## Explore the research tree
+
+Researchers open a research question, follow the experiments that tested it, and inspect why an agent picked its next job. A completed negative result, a crash, and a result from a different cohort each tell a different story. The tree brings the measured outcome, conditions, source, and evidence receipt into the same view. [Research tree design](PLATFORM.md#research-tree)
+
 ## Start here
 
 Put these Markdown files at the root of the team’s hackathon repository so each teammate and their assistant can use the same instructions. Open that checkout, claim a task on the [team board](TASKS.md), substitute your task ID, and paste this into your assistant.

@@ -79,6 +79,37 @@ The catalog order is `plain-l1`, `dict-a-l6`, `dict-b-l6`. A no-evidence baselin
 
 P3 owns `python -m benchmark.run --job dict-a-l6 --cohort A --split holdout` and `python -m benchmark.agent --memory on --base-url http://127.0.0.1:8000 --out receipts/on.json`. `--memory off` bypasses retrieval and uses an empty candidate list. B reads its token from `MEMORY_TOKEN`. The output includes request, model, catalog and budget, selected and skipped jobs, candidate/result refs and applicability reasons, exact used refs, executed configuration, runtime, status, metric, input and output byte counts, hashes and round-trip evidence. The planning arithmetic above came from a local Python 3.11 standard-library probe. Build acceptance requires receipts from the new runner. For the correction, separately measure `dict-a-l1` on B calibration (probe 760/928), yielding a valid negative under B. Credit that receipt as the replacement and retain the version link.
 
+## Research tree
+
+Use a read-only browser view at `/research` for researchers reviewing agent work. The first screen opens the benchmark question and its branches. A search box uses the existing scoped semantic search to find other researchers’ results in the current project. Selecting a hit opens its branch when present or its evidence inspector when the result has no local lineage. Researchers can browse by question and compare measurements across agents in the same project.
+
+| View | Interaction |
+| --- | --- |
+| Research tree | Expand a question into measured observations and agent decisions. Show the two cohort A results and the cohort B distractor. Under the decision, show the follow-up run and explain which candidate was skipped and which observation was ruled out by its conditions. |
+| Evidence inspector | Select a node to see the author and source artifact, execution status, scientific validity, outcome, conditions, configuration, metric and threshold, and the measured receipt. Select the agent decision to see its exact cited result versions, rationale, and the job that actually ran. |
+| Compare runs | Switch among off, on, and corrected rehearsal receipts for the same question. Show executed job and byte ratio together. Label unavailable evidence on historical receipts and keep exact-version references. |
+
+The layout uses an expandable semantic tree and a details pane. On narrow screens show details below the selected branch. Support keyboard navigation, visible focus, clear loading, empty and unavailable states, and text labels for outcome and validity. A completed valid negative and an execution failure use distinct labels. Show conditions before interpreting an outcome.
+
+```mermaid
+flowchart LR
+    Q[Can we shrink independent cohort A messages?]
+    Q --> A[Matched dictionary met threshold]
+    Q --> B[Wrong dictionary missed threshold]
+    Q --> C[Cohort B result]
+    Q --> D[Agent B decision]
+    A -->|Supports follow-up| D
+    B -->|Informs skipped job| D
+    C -->|Cohort mismatch| D
+    D --> E[Level 6 follow-up receipt]
+```
+
+P4 owns the browser page and the tree manifest emitted by the harness. Serve a simple static HTML, CSS and JavaScript bundle from the API origin so the UI can use its existing routes. The manifest holds `question`, decision and run IDs, and observation references as `{result_id, version}`. Each decision receipt already carries `used_refs`, `skipped_jobs`, `rejected_candidates`, and the executed run. Use those links to render lineage. Group branches from the manifest and hydrate observation details and evidence through the platform API. The first view can start against stubbed HTTP responses and the harness receipt shape. P1 provides a same-origin mount point and a restricted project reader token for the local demo. Keep the token in memory for the session. Ship a labeled synthetic manifest for preview and load demo receipts from the local harness. Keep private receipts, result text, and tokens out of static files.
+
+Render referenced observations only after a versioned authorized read. Cross-project, expired, and superseded observations get a generic “Evidence unavailable” state wherever a receipt already references a ref. Clear previously loaded details on a failed recheck or identity change. Inspecting a receipt rechecks its references, and opening evidence uses the exact cited version. Historical execution receipts retain the executed job and metric. Keep full local demo receipts in the authorized rehearsal context, and use only synthetic redacted material for public replay.
+
+For research at scale, render the visible question as a tree backed by a graph. Keep a shared observation once and render cross-links from every decision that cites it. Future expansion uses paginated neighbors, semantic entry points, and filters for project, cohort, source and validity. A result from another researcher is discoverable through authorized project membership. The first demo needs one question, branching and an evidence inspector with existing search. The governed execution path and comparison receipts remain the submission centerpiece.
+
 ## ARA and AutoSci adapters
 
 Both adapters transform a single artifact record plus a JSON sidecar for explicit metric, settings and evidence into the publish body. Use `python -m adapters.ara --input PATH --node ID --context PATH [--publish]` and `python -m adapters.autosci --input PATH --context PATH [--publish]`. Default prints normalized JSON. `--publish` posts to the shared API using `MEMORY_BASE_URL` and `MEMORY_TOKEN` and prints the returned ref. Sidecar keys are `fixture_revision`, `conditions`, `configuration`, `metric`, `evidence`, `expires_at`, and `source` with `revision`, `artifact`, `source_agent` and `record`. The adapter sets `source.system` and validates record-to-sidecar and evidence agreement. Missing or contradictory data fails normalization. Source paths are attribution and evidence data is explicitly supplied. Agent A generates the benchmark artifacts and sidecars from runner receipts. Use PyYAML safe loading, a narrow shape validator and scoped fixture paths. Budget 45 minutes per adapter and 25 minutes to integrate both.

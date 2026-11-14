@@ -9,6 +9,14 @@ Claim a role by adding your name. P4 is integration lead and submitter. P2 backs
 | P3 | Agent and benchmark | Open | Ready | Own `benchmark/`. Build `python -m benchmark.run --job dict-a-l6 --cohort A --split holdout` and run the full PLATFORM.md calibration, replacement and holdout matrix. Pass when all streams decode exactly, both A dictionary positives and the A mismatch straddle 0.40, and one job completes in under two seconds. Hand P2 the receipt shape and P4 the stateless B runner. |
 | P4 | Integration and demo | Open | Ready | Own `demo/`, `requirements.txt` and rehearsal docs. Scaffold `python -m demo.rehearse --out receipts/rehearsal` with separate A and B processes and the shared JSON example. Pass when the dry wiring run invokes A and fresh B processes, validates receipt shape, propagates child failures, and writes an assertion summary. Integrate P1–P3 behind those entry points and own clean-checkout rehearsal, recording and submission. |
 
+## Research tree
+
+P4 owns `demo/web/` and the small research tree manifest. A teammate who finishes their initial task can pick up the browser view against stub responses. P1 supplies the same-origin mount and project reader access. P3 supplies the existing decision and execution receipts. Start with one expandable question, evidence details, and a scoped search field. Add the run comparison after the real Atlas handoff passes.
+
+Pass when a researcher can open a branch with the keyboard, inspect the exact cited version and measured receipt, explain why the wrong-cohort observation was excluded, and compare the jobs executed with memory off, on and corrected. Search should open another authorized researcher’s result. Verify that an expired or superseded ref loses its evidence details and that a second project can open its own result while the first project’s evidence is unavailable.
+
+Review the UI at 3:15 with the clean rehearsal. Fold a brief click-through into the live demo if it shows the evidence reliably. Use the verified run receipts for comparison if the browser view is unfinished at the 3:45 freeze.
+
 ## Handoff between producers and callers
 
 - P3 writes a single-run JSON receipt to stdout. Core fields are `run_id`, `fixture_revision`, `conditions`, `configuration`, `metric`, `execution`, `validity`, `direction`, `input_bytes`, `output_bytes`, `roundtrip_ok`, `fixture_sha256`, `dictionary_sha256` (null for plain), `zlib_version` and `elapsed_ms`. Conditions, configuration and metric match the publish body. P2's `python -m adapters.seed --out receipts/producer.json` invokes the runner for the three calibration jobs, writes the artifact shapes and publishes using A's token. Accept optional `--promising-expires-at` with a UTC timestamp for the expiry scenario. Its JSON output gives named refs `promising`, `negative`, `distractor` and the three receipts. The seed process exits before B starts.
